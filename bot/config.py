@@ -1,4 +1,6 @@
 from os import getenv
+import os
+import json
 import logging
 import asyncio
 from aiogram import Bot, Dispatcher, types
@@ -16,6 +18,40 @@ GROUP1_ID = int(getenv("GROUP1_ID", "0"))
 GROUP2_IDS = [int(x) for x in getenv("GROUP2_IDS", "").split(",") if x]
 TOPIC_IDS_GROUP1 = [int(x) for x in getenv("TOPIC_IDS_GROUP1", "").split(",") if x]
 LOG_CHANNEL_ID = int(getenv("LOG_CHANNEL_ID", "0"))
+ADMIN_ID = int(getenv("ADMIN_ID", "0"))
+
+IDS_FILE = "ids.json"
+
+
+def load_ids() -> None:
+    global GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1
+    if os.path.exists(IDS_FILE):
+        try:
+            with open(IDS_FILE, "r") as f:
+                data = json.load(f)
+            GROUP1_ID = data.get("GROUP1_ID", GROUP1_ID)
+            GROUP2_IDS = data.get("GROUP2_IDS", GROUP2_IDS)
+            TOPIC_IDS_GROUP1 = data.get("TOPIC_IDS_GROUP1", TOPIC_IDS_GROUP1)
+        except Exception:
+            pass
+    else:
+        save_ids()
+
+
+def save_ids() -> None:
+    data = {
+        "GROUP1_ID": GROUP1_ID,
+        "GROUP2_IDS": GROUP2_IDS,
+        "TOPIC_IDS_GROUP1": TOPIC_IDS_GROUP1,
+    }
+    try:
+        with open(IDS_FILE, "w") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+
+load_ids()
 
 logging.basicConfig(
     level=logging.INFO,

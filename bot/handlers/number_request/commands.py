@@ -6,7 +6,16 @@ from zoneinfo import ZoneInfo
 
 from aiogram import types
 
-from ...config import dp, bot, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1, logger
+from ...config import (
+    dp,
+    bot,
+    GROUP1_ID,
+    GROUP2_IDS,
+    TOPIC_IDS_GROUP1,
+    ADMIN_ID,
+    logger,
+    save_ids,
+)
 from ...queue import (
     number_queue,
     user_queue,
@@ -18,15 +27,19 @@ from ...queue import (
 from ... import queue as queue_state
 from ...storage import save_data, QUEUE_FILE
 from ...utils import phone_pattern
+from ... import config as cfg
 
 
 @dp.message_handler(commands=["work"])
 async def remove_topic_from_ignore(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+
     if msg.message_thread_id is not None:
         if msg.message_thread_id in IGNORED_TOPICS:
             IGNORED_TOPICS.remove(msg.message_thread_id)
             await msg.reply(
-                "✅ Эта тема снова активна. Бот теперь реагирует на номера."
+                "✅ Эта тема снова активна. Бот теперь реагирует на номера.",
             )
             save_data()
         else:
@@ -157,14 +170,133 @@ async def handle_id_command(msg: types.Message):
 
 @dp.message_handler(commands=["nework"])
 async def add_topic_to_ignore(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+
     if msg.message_thread_id is not None:
         IGNORED_TOPICS.add(msg.message_thread_id)
         save_data()
         await msg.reply(
-            "✅ Эта тема теперь исключена. Бот не будет здес реагировать на номера."
+            "✅ Эта тема теперь исключена. Бот не будет здес реагировать на номера.",
         )
     else:
         await msg.reply("⚠️ Команду можно использовать только внутри темы.")
+
+
+@dp.message_handler(commands=["group1_add"])
+async def handle_group1_add(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+
+    args = msg.get_args().strip()
+    if args:
+        try:
+            group_id = int(args)
+        except ValueError:
+            await msg.reply("ID должен быть числом")
+            return
+    else:
+        group_id = msg.chat.id
+
+    global GROUP1_ID
+    GROUP1_ID = cfg.GROUP1_ID = group_id
+    save_ids()
+    await msg.reply(f"GROUP1_ID установлен: <code>{group_id}</code>", parse_mode="HTML")
+
+
+@dp.message_handler(commands=["group1_remove"])
+async def handle_group1_remove(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+
+    global GROUP1_ID
+    GROUP1_ID = cfg.GROUP1_ID = 0
+    save_ids()
+    await msg.reply("GROUP1_ID удалён")
+
+
+@dp.message_handler(commands=["group2_add"])
+async def handle_group2_add(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+
+    args = msg.get_args().strip()
+    if args:
+        try:
+            group_id = int(args)
+        except ValueError:
+            await msg.reply("ID должен быть числом")
+            return
+    else:
+        group_id = msg.chat.id
+
+    if group_id not in GROUP2_IDS:
+        GROUP2_IDS.append(group_id)
+        save_ids()
+    await msg.reply(f"Добавлена группа2: <code>{group_id}</code>", parse_mode="HTML")
+
+
+@dp.message_handler(commands=["group2_remove"])
+async def handle_group2_remove(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+
+    args = msg.get_args().strip()
+    if args:
+        try:
+            group_id = int(args)
+        except ValueError:
+            await msg.reply("ID должен быть числом")
+            return
+    else:
+        group_id = msg.chat.id
+
+    if group_id in GROUP2_IDS:
+        GROUP2_IDS.remove(group_id)
+        save_ids()
+        await msg.reply(
+            f"Группа2 <code>{group_id}</code> удалена", parse_mode="HTML"
+        )
+    else:
+        await msg.reply("Такой группы нет в списке")
+
+
+@dp.message_handler(commands=["thread_add"])
+async def handle_thread_add(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+
+    if msg.chat.id != GROUP1_ID or msg.message_thread_id is None:
+        await msg.reply("Команда должна выполняться в теме первой группы")
+        return
+
+    topic_id = msg.message_thread_id
+    if topic_id not in TOPIC_IDS_GROUP1:
+        TOPIC_IDS_GROUP1.append(topic_id)
+        save_ids()
+    await msg.reply(
+        f"Тема <code>{topic_id}</code> добавлена", parse_mode="HTML"
+    )
+
+
+@dp.message_handler(commands=["thread_remove"])
+async def handle_thread_remove(msg: types.Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+
+    if msg.chat.id != GROUP1_ID or msg.message_thread_id is None:
+        await msg.reply("Команда должна выполняться в теме первой группы")
+        return
+
+    topic_id = msg.message_thread_id
+    if topic_id in TOPIC_IDS_GROUP1:
+        TOPIC_IDS_GROUP1.remove(topic_id)
+        save_ids()
+        await msg.reply(
+            f"Тема <code>{topic_id}</code> удалена", parse_mode="HTML"
+        )
+    else:
+        await msg.reply("Такой темы нет в списке")
 
 
 @dp.message_handler(commands=["stop_work"])
