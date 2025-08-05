@@ -1,0 +1,45 @@
+import json
+import os
+from collections import deque
+
+from .queue import number_queue, user_queue, bindings
+
+QUEUE_FILE = 'number_queue.json'
+USER_FILE = 'user_queue.json'
+BINDINGS_FILE = 'bindings.json'
+HISTORY_FILE = 'history.json'
+
+history = []
+
+
+def save_data():
+    with open(QUEUE_FILE, 'w') as f:
+        json.dump(list(number_queue), f)
+    with open(USER_FILE, 'w') as f:
+        json.dump(list(user_queue), f)
+    with open(BINDINGS_FILE, 'w') as f:
+        json.dump(bindings, f)
+
+
+def load_data():
+    if os.path.exists(QUEUE_FILE):
+        with open(QUEUE_FILE, 'r') as f:
+            number_queue.extend(deque(json.load(f)))
+    if os.path.exists(USER_FILE):
+        with open(USER_FILE, 'r') as f:
+            user_queue.extend(deque(json.load(f)))
+    if os.path.exists(BINDINGS_FILE):
+        with open(BINDINGS_FILE, 'r') as f:
+            bindings.update(json.load(f))
+
+
+def load_history():
+    global history
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, 'r') as f:
+            history = json.load(f)
+
+
+def save_history():
+    with open(HISTORY_FILE, 'w') as f:
+        json.dump(history, f)
