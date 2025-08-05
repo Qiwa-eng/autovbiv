@@ -74,9 +74,11 @@ async def cmd_joke(msg: types.Message) -> None:
     await msg.reply(f"<code>{escape(joke)}</code>", parse_mode="HTML")
 
 
+# Support multiple language variations for the stats command
 @dp.message_handler(commands=["stats"])
 @dp.message_handler(
-    lambda m: m.text and m.text.lower().startswith("/статистика")
+    lambda m: m.text
+    and m.text.lower().startswith( ("/стат", "/stat") )
 )
 async def cmd_stats(msg: types.Message) -> None:
     logger.info(f"[CMD {msg.text}] user_id={msg.from_user.id}")
