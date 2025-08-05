@@ -1,7 +1,12 @@
 from collections import deque
+import asyncio
 
 number_queue = deque()
 user_queue = deque()
 bindings = {}
 blocked_numbers = {}
 IGNORED_TOPICS = set()
+
+# Locks for async-safe operations on queues
+number_queue_lock = asyncio.Lock()
+user_queue_lock = asyncio.Lock()

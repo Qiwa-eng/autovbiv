@@ -7,7 +7,15 @@ from aiogram import types
 from aiogram.utils.exceptions import MessageNotModified
 
 from ..config import dp, bot, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1, logger
-from ..queue import number_queue, user_queue, bindings, blocked_numbers, IGNORED_TOPICS
+from ..queue import (
+    number_queue,
+    user_queue,
+    bindings,
+    blocked_numbers,
+    IGNORED_TOPICS,
+    number_queue_lock,
+    user_queue_lock,
+)
 from ..storage import save_data, load_data, load_history, save_history, history, QUEUE_FILE
 from ..utils import phone_pattern, get_number_action_keyboard, fetch_russian_joke
 
@@ -27,13 +35,18 @@ async def handle_number_request(msg: types.Message):
     if msg.chat.id not in GROUP2_IDS:
         return
 
-    for entry in user_queue:
-        if entry['user_id'] == msg.from_user.id:
-            return await msg.reply("⚠️ Вы уже в очереди на номер.")
+    async with user_queue_lock:
+        for entry in user_queue:
+            if entry['user_id'] == msg.from_user.id:
+                return await msg.reply("⚠️ Вы уже в очереди на номер.")
 
-    if number_queue:
-        number = number_queue.popleft()
+    async with number_queue_lock:
+        if number_queue:
+            number = number_queue.popleft()
+        else:
+            number = None
 
+    if number:
         message_text = (
             f"<b>Ваш номер:</b> {number['text']}\n"
             f"<code>Нажмите \"Ответить\" и отправьте код от номера</code>\n\n"
@@ -60,8 +73,8 @@ async def handle_number_request(msg: types.Message):
         save_data()
         logger.info(f"[ВЫДАН НОМЕР] {number['text']} → user_id={msg.from_user.id}")
     else:
-        position = len(user_queue) + 1
-
+        async with user_queue_lock:
+            position = len(user_queue) + 1
         notify = await msg.reply(
             f"⏳ Номеров нет, вы в очереди ({position})",
             reply_markup=types.InlineKeyboardMarkup().add(
@@ -69,15 +82,16 @@ async def handle_number_request(msg: types.Message):
             ),
         )
 
-        user_queue.append(
-            {
-                "user_id": msg.from_user.id,
-                "chat_id": msg.chat.id,
-                "request_msg_id": msg.message_id,
-                "timestamp": datetime.utcnow().isoformat(),
-                "notify_msg_id": notify.message_id,
-            }
-        )
+        async with user_queue_lock:
+            user_queue.append(
+                {
+                    "user_id": msg.from_user.id,
+                    "chat_id": msg.chat.id,
+                    "request_msg_id": msg.message_id,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "notify_msg_id": notify.message_id,
+                }
+            )
 
         save_data()
         await try_dispatch_next()
@@ -134,8 +148,10 @@ async def handle_clear_queue(msg: types.Message):
     if msg.chat.id not in GROUP2_IDS:
         return
 
-    number_queue.clear()
-    user_queue.clear()
+    async with number_queue_lock:
+        number_queue.clear()
+    async with user_queue_lock:
+        user_queue.clear()
     bindings.clear()
     save_data()
 
@@ -201,15 +217,16 @@ async def handle_skip_number(call: types.CallbackQuery):
 
     number_text = binding["text"]
 
-    number_queue.append(
-        {
-            "message_id": binding["orig_msg_id"],
-            "topic_id": binding["topic_id"],
-            "text": number_text,
-            "from_group_id": binding["group_id"],
-            "added_at": binding.get("added_at", datetime.utcnow().timestamp()),
-        }
-    )
+    async with number_queue_lock:
+        number_queue.append(
+            {
+                "message_id": binding["orig_msg_id"],
+                "topic_id": binding["topic_id"],
+                "text": number_text,
+                "from_group_id": binding["group_id"],
+                "added_at": binding.get("added_at", datetime.utcnow().timestamp()),
+            }
+        )
 
     try:
         await call.message.edit_text("🔁 Номер возвращён в очередь.")
@@ -261,7 +278,8 @@ async def handle_error_choice(call: types.CallbackQuery):
 
     queue_user = binding.get("queue_data")
     if queue_user:
-        user_queue.append(queue_user)
+        async with user_queue_lock:
+            user_queue.append(queue_user)
         await update_queue_messages()
 
     bindings.pop(str(msg_id), None)
@@ -321,26 +339,30 @@ async def handle_number_sources(msg: types.Message):
             else:
                 blocked_numbers.pop(number_text, None)
 
-        for item in number_queue:
-            if number_text in item.get("text", ""):
-                await bot.send_message(
-                    chat_id=msg.chat.id,
-                    message_thread_id=msg.message_thread_id,
-                    reply_to_message_id=msg.message_id,
-                    text="⚠️ Такой номер уже в очереди",
+        async with number_queue_lock:
+            duplicate = any(
+                number_text in item.get("text", "") for item in number_queue
+            )
+            if not duplicate:
+                number_queue.append(
+                    {
+                        "message_id": msg.message_id,
+                        "topic_id": msg.message_thread_id,
+                        "text": msg.text,
+                        "from_group_id": msg.chat.id,
+                        "added_at": datetime.utcnow().timestamp(),
+                    }
                 )
-                logger.info(f"[ДУБЛИКАТ В ОЧЕРЕДИ] {number_text}")
-                return
+        if duplicate:
+            await bot.send_message(
+                chat_id=msg.chat.id,
+                message_thread_id=msg.message_thread_id,
+                reply_to_message_id=msg.message_id,
+                text="⚠️ Такой номер уже в очереди",
+            )
+            logger.info(f"[ДУБЛИКАТ В ОЧЕРЕДИ] {number_text}")
+            return
 
-        number_queue.append(
-            {
-                "message_id": msg.message_id,
-                "topic_id": msg.message_thread_id,
-                "text": msg.text,
-                "from_group_id": msg.chat.id,
-                "added_at": datetime.utcnow().timestamp(),
-            }
-        )
         save_data()
 
         if history:
@@ -373,17 +395,20 @@ async def leave_queue(call: types.CallbackQuery):
     if call.message.chat.id not in GROUP2_IDS:
         return
 
-    removed = False
-    new_queue = []
-    for u in user_queue:
-        if u['user_id'] == call.from_user.id:
-            removed = True
-        else:
-            new_queue.append(u)
+    async with user_queue_lock:
+        removed = False
+        new_queue = []
+        for u in user_queue:
+            if u['user_id'] == call.from_user.id:
+                removed = True
+            else:
+                new_queue.append(u)
+
+        if removed:
+            user_queue.clear()
+            user_queue.extend(new_queue)
 
     if removed:
-        user_queue.clear()
-        user_queue.extend(new_queue)
         try:
             await call.message.edit_text("❌ Вы вышли из очереди.")
         except Exception:
@@ -459,7 +484,12 @@ async def joke_dispatcher():
 
 
 async def try_dispatch_next():
-    if not number_queue and user_queue:
+    async with number_queue_lock:
+        empty_numbers = not number_queue
+    async with user_queue_lock:
+        has_users = bool(user_queue)
+
+    if empty_numbers and has_users:
         now = datetime.utcnow().timestamp()
         if not hasattr(try_dispatch_next, "last_notice") or now - try_dispatch_next.last_notice > 120:
             try_dispatch_next.last_notice = now
@@ -475,11 +505,19 @@ async def try_dispatch_next():
                     logger.warning(f"[ОШИБКА ОПОВЕЩЕНИЯ] тема {topic_id}: {e}")
         return
 
-    while number_queue and user_queue:
-        number = number_queue.popleft()
-        sorted_users = sorted(user_queue, key=lambda u: datetime.fromisoformat(u['timestamp']))
-        user = sorted_users[0]
-        user_queue.remove(user)
+    while True:
+        async with number_queue_lock:
+            async with user_queue_lock:
+                if number_queue and user_queue:
+                    number = number_queue.popleft()
+                    sorted_users = sorted(
+                        user_queue,
+                        key=lambda u: datetime.fromisoformat(u['timestamp'])
+                    )
+                    user = sorted_users[0]
+                    user_queue.remove(user)
+                else:
+                    break
 
         await update_queue_messages()
 
@@ -498,7 +536,8 @@ async def try_dispatch_next():
             )
         except Exception as e:
             logger.warning(f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: {e}")
-            user_queue.appendleft(user)
+            async with user_queue_lock:
+                user_queue.appendleft(user)
             await update_queue_messages()
             continue
 
