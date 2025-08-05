@@ -7,6 +7,7 @@ from ...queue import (
     number_queue,
     user_queue,
     bindings,
+    contact_bindings,
     blocked_numbers,
     contact_requests,
     number_queue_lock,
@@ -66,7 +67,8 @@ async def handle_skip_number(call: types.CallbackQuery):
 @dp.callback_query_handler(lambda c: c.data == "contact_drop")
 async def handle_contact_drop(call: types.CallbackQuery):
     msg_id = call.message.message_id
-    binding = bindings.get(str(msg_id))
+    msg_key = str(msg_id)
+    binding = bindings.get(msg_key) or contact_bindings.get(msg_key)
 
     if not binding:
         return await call.answer("⚠️ Номер не найден или уже обработан.", show_alert=True)
