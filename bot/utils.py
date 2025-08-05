@@ -6,9 +6,13 @@ phone_pattern = re.compile(r"(?:\+7|7|8)?[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d
 
 
 def get_number_action_keyboard():
-    return InlineKeyboardMarkup().add(
-        InlineKeyboardButton("\uD83D\uDD01 \u0421\u043A\u0438\u043F", callback_data="skip_number"),
-        InlineKeyboardButton("\u274C \u041E\u0448\u0438\u0431\u043A\u0430", callback_data="error_reason")
+    """Keyboard with actions for an issued number."""
+    return (
+        InlineKeyboardMarkup(row_width=2)
+        .add(
+            InlineKeyboardButton("\uD83D\uDD04 \u0414\u0440\u0443\u0433\u043E\u0439", callback_data="skip_number"),
+            InlineKeyboardButton("\u26D4 \u041F\u0440\u043E\u0431\u043B\u0435\u043C\u0430", callback_data="error_reason"),
+        )
     )
 
 JOKES = [

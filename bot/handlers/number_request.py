@@ -48,10 +48,9 @@ async def handle_number_request(msg: types.Message):
 
     if number:
         message_text = (
-            f"<b>Ваш номер:</b> {number['text']}\n"
-            f"<code>Нажмите \"Ответить\" и отправьте код от номера</code>\n\n"
-            f"❗️ <b>Если выбивает ошибку</b> — сразу кидайте <u>скриншот ошибки</u> так же ответом.\n"
-            f"Без скрина вас будут дрочить этим номером и закидывать повторками."
+            f"🎉 <b>Ваш номер:</b> <code>{number['text']}</code>\n\n"
+            "✉️ <i>Ответьте на это сообщение и отправьте код.</i>\n"
+            "⚠️ <b>Если есть проблема</b>, воспользуйтесь кнопкой ниже и приложите <u>скрин</u>."
         )
 
         sent = await bot.send_message(
@@ -59,6 +58,7 @@ async def handle_number_request(msg: types.Message):
             text=message_text,
             reply_to_message_id=msg.message_id,
             reply_markup=get_number_action_keyboard(),
+            parse_mode="HTML",
         )
 
         bindings[str(sent.message_id)] = {
@@ -76,9 +76,10 @@ async def handle_number_request(msg: types.Message):
         async with user_queue_lock:
             position = len(user_queue) + 1
         notify = await msg.reply(
-            f"⏳ Номеров нет, вы в очереди ({position})",
+            f"⏳ <b>Свободных номеров нет.</b>\nВаша позиция в очереди: <b>{position}</b>",
+            parse_mode="HTML",
             reply_markup=types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton("Выйти из очереди", callback_data="leave_queue")
+                types.InlineKeyboardButton("🚪 Выйти из очереди", callback_data="leave_queue")
             ),
         )
 
@@ -101,10 +102,14 @@ async def handle_number_request(msg: types.Message):
 @dp.callback_query_handler(lambda c: c.data == "error_reason")
 async def error_reason_menu(call: types.CallbackQuery):
     keyboard = types.InlineKeyboardMarkup().add(
-        types.InlineKeyboardButton("❌ Моментальная ошибка", callback_data="error_ban"),
-        types.InlineKeyboardButton("⌛ Не ввели код", callback_data="error_noban"),
+        types.InlineKeyboardButton("💥 Моментальная ошибка", callback_data="error_ban"),
+        types.InlineKeyboardButton("⌛ Код не пришёл", callback_data="error_noban"),
     )
-    await call.message.edit_reply_markup(reply_markup=keyboard)
+    await call.message.edit_text(
+        f"{call.message.html_text}\n\n<b>Выберите причину:</b>",
+        parse_mode="HTML",
+        reply_markup=keyboard,
+    )
 
 
 async def update_queue_messages():
@@ -114,10 +119,14 @@ async def update_queue_messages():
             await bot.edit_message_text(
                 chat_id=user["chat_id"],
                 message_id=user["notify_msg_id"],
-                text=f"⏳ Номеров нет, вы в очереди ({position})",
+                text=(
+                    "⏳ <b>Ожидание номера</b>\n"
+                    f"Ваша позиция: <b>{position}</b>"
+                ),
+                parse_mode="HTML",
                 reply_markup=types.InlineKeyboardMarkup().add(
                     types.InlineKeyboardButton(
-                        "Выйти из очереди", callback_data="leave_queue"
+                        "🚪 Выйти из очереди", callback_data="leave_queue"
                     )
                 ),
             )
@@ -275,9 +284,9 @@ async def handle_skip_number(call: types.CallbackQuery):
         )
 
     try:
-        await call.message.edit_text("🔁 Номер возвращён в очередь.")
+        await call.message.edit_text("🔄 Номер возвращён в очередь.")
     except Exception:
-        await call.message.reply("🔁 Номер возвращён в очередь.")
+        await call.message.reply("🔄 Номер возвращён в очередь.")
 
     logger.info(f"[СКИП] {number_text} → user_id={user_id}")
 
@@ -301,13 +310,13 @@ async def handle_error_choice(call: types.CallbackQuery):
         blocked_until = datetime.utcnow() + timedelta(minutes=30)
         blocked_numbers[number_text] = blocked_until.timestamp()
         await call.message.edit_text(
-            "❌ Номер удалён.\n⛔ Заблокирован на 30 минут (моментальная ошибка)."
+            "🚫 Номер удалён.\n⛔ Заблокирован на 30 минут (моментальная ошибка)."
         )
         reason = "моментальная ошибка"
         logger.info(f"[ОШИБКА С БАНОМ] {number_text} → user_id={user_id}")
     else:
         await call.message.edit_text(
-            "❌ Номер удалён.\n⌛ Без блокировки (не пришёл код)."
+            "🚫 Номер удалён.\n⌛ Код не пришёл."
         )
         reason = "не пришёл код"
         logger.info(f"[ОШИБКА БЕЗ БАНА] {number_text} → user_id={user_id}")
@@ -457,9 +466,9 @@ async def leave_queue(call: types.CallbackQuery):
 
     if removed:
         try:
-            await call.message.edit_text("❌ Вы вышли из очереди.")
+            await call.message.edit_text("🚪 Вы покинули очередь.")
         except Exception:
-            await call.message.reply("❌ Вы вышли из очереди.")
+            await call.message.reply("🚪 Вы покинули очередь.")
         logger.info(f"[ВЫХОД ИЗ ОЧЕРЕДИ] user_id={call.from_user.id}")
     else:
         await call.answer("Вы не были в очереди.", show_alert=True)
@@ -569,10 +578,9 @@ async def try_dispatch_next():
         await update_queue_messages()
 
         message_text = (
-            f"<b>Ваш номер:</b> {number['text']}\n"
-            f"<code>Нажмите \"Ответить\" и отправьте код от номера</code>\n\n"
-            f"❗️ <b>Если выбивает ошибку</b> — сразу кидайте <u>скриншот ошибки</u> так же ответом.\n"
-            f"Без скрина вас будут дрочить этим номером и закидывать повторками."
+            f"🎉 <b>Ваш номер:</b> <code>{number['text']}</code>\n\n"
+            "✉️ <i>Ответьте на это сообщение и отправьте код.</i>\n"
+            "⚠️ <b>Если есть проблема</b>, воспользуйтесь кнопкой ниже и приложите <u>скрин</u>."
         )
         try:
             sent = await bot.send_message(
@@ -580,6 +588,7 @@ async def try_dispatch_next():
                 text=message_text,
                 reply_to_message_id=user['request_msg_id'],
                 reply_markup=get_number_action_keyboard(),
+                parse_mode="HTML",
             )
         except Exception as e:
             logger.warning(f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: {e}")
