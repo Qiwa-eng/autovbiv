@@ -2,12 +2,13 @@ import json
 import os
 from collections import deque
 
-from .queue import number_queue, user_queue, bindings
+from .queue import number_queue, user_queue, bindings, IGNORED_TOPICS
 
 QUEUE_FILE = 'number_queue.json'
 USER_FILE = 'user_queue.json'
 BINDINGS_FILE = 'bindings.json'
 HISTORY_FILE = 'history.json'
+IGNORED_FILE = 'ignored_topics.json'
 
 history = []
 
@@ -19,6 +20,8 @@ def save_data():
         json.dump(list(user_queue), f)
     with open(BINDINGS_FILE, 'w') as f:
         json.dump(bindings, f)
+    with open(IGNORED_FILE, 'w') as f:
+        json.dump(list(IGNORED_TOPICS), f)
 
 
 def load_data():
@@ -31,6 +34,9 @@ def load_data():
     if os.path.exists(BINDINGS_FILE):
         with open(BINDINGS_FILE, 'r') as f:
             bindings.update(json.load(f))
+    if os.path.exists(IGNORED_FILE):
+        with open(IGNORED_FILE, 'r') as f:
+            IGNORED_TOPICS.update(json.load(f))
 
 
 def load_history():
