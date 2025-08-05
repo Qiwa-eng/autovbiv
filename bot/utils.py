@@ -14,6 +14,9 @@ def get_number_action_keyboard():
             InlineKeyboardButton("\U0001F504 \u0414\u0440\u0443\u0433\u043E\u0439", callback_data="skip_number"),
             InlineKeyboardButton("\u26D4 \u041F\u0440\u043E\u0431\u043B\u0435\u043C\u0430", callback_data="error_reason"),
         )
+        .add(
+            InlineKeyboardButton("\U0001F4DE \u0421\u0432\u044F\u0437\u044C \u0441 \u0434\u0440\u043E\u043F\u043E\u043C", callback_data="contact_drop")
+        )
     )
 
 JOKES: List[str] = [

@@ -80,6 +80,7 @@ async def handle_number_request(msg: types.Message):
             "topic_id": number['topic_id'],
             "group_id": number['from_group_id'],
             "user_id": msg.from_user.id,
+            "drop_id": number.get("drop_id"),
             "text": number['text'],
             "added_at": number.get("added_at"),
         }
@@ -164,6 +165,7 @@ async def handle_number_sources(msg: types.Message):
                         "topic_id": msg.message_thread_id,
                         "text": msg.text,
                         "from_group_id": msg.chat.id,
+                        "drop_id": msg.from_user.id,
                         "added_at": datetime.utcnow().timestamp(),
                     }
                 )
