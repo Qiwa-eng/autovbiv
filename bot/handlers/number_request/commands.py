@@ -1,6 +1,8 @@
 import os
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta
 from html import escape
+from zoneinfo import ZoneInfo
 
 from aiogram import types
 
@@ -13,6 +15,7 @@ from ...queue import (
     number_queue_lock,
     user_queue_lock,
 )
+from ... import queue as queue_state
 from ...storage import save_data, QUEUE_FILE
 from ...utils import phone_pattern
 
@@ -162,4 +165,59 @@ async def add_topic_to_ignore(msg: types.Message):
         )
     else:
         await msg.reply("⚠️ Команду можно использовать только внутри темы.")
+
+
+@dp.message_handler(commands=["stop_work"])
+async def handle_stop_work(msg: types.Message):
+    if msg.chat.id not in GROUP2_IDS:
+        return
+    if queue_state.start_task:
+        queue_state.start_task.cancel()
+        queue_state.start_task = None
+    queue_state.WORKING = False
+    await msg.reply("⏸️ Бот приостановил работу.")
+
+
+@dp.message_handler(commands=["start_work"])
+async def handle_start_work(msg: types.Message):
+    if msg.chat.id not in GROUP2_IDS:
+        return
+
+    args = msg.get_args().strip()
+    if args:
+        try:
+            target = datetime.strptime(args, "%H:%M").time()
+        except ValueError:
+            await msg.reply("Неверный формат времени. Используйте HH:MM")
+            return
+
+        msk = ZoneInfo("Europe/Moscow")
+        now = datetime.now(msk)
+        start_dt = datetime.combine(now.date(), target, msk)
+        if start_dt <= now:
+            start_dt += timedelta(days=1)
+        delay = (start_dt - now).total_seconds()
+
+        if queue_state.start_task:
+            queue_state.start_task.cancel()
+
+        async def resume():
+            await asyncio.sleep(delay)
+            queue_state.WORKING = True
+            queue_state.start_task = None
+            try:
+                await bot.send_message(msg.chat.id, "▶️ Бот возобновил работу.")
+            except Exception as e:
+                logger.warning(f"[START_WORK_NOTIFY] {e}")
+
+        queue_state.start_task = asyncio.create_task(resume())
+        await msg.reply(
+            f"⏳ Работа возобновится в {start_dt.strftime('%H:%M')} МСК"
+        )
+    else:
+        if queue_state.start_task:
+            queue_state.start_task.cancel()
+            queue_state.start_task = None
+        queue_state.WORKING = True
+        await msg.reply("▶️ Бот возобновил работу.")
 

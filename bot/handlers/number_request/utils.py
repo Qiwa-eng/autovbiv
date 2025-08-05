@@ -15,6 +15,7 @@ from ...queue import (
     number_queue_lock,
     user_queue_lock,
 )
+from ... import queue as queue_state
 from ...storage import save_data, save_history, history, issued_numbers
 from ...utils import get_number_action_keyboard, fetch_russian_joke
 
@@ -114,6 +115,8 @@ async def joke_dispatcher():
 
 
 async def try_dispatch_next():
+    if not queue_state.WORKING:
+        return
     async with number_queue_lock:
         empty_numbers = not number_queue
     async with user_queue_lock:

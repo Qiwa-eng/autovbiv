@@ -10,3 +10,7 @@ IGNORED_TOPICS = set()
 # Locks for async-safe operations on queues
 number_queue_lock = asyncio.Lock()
 user_queue_lock = asyncio.Lock()
+
+# Global work state
+WORKING = True
+start_task = None
