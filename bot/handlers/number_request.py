@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from statistics import mean
 
 from aiogram import types
+from aiogram.utils.exceptions import MessageNotModified
 
 from ..config import dp, bot, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1, logger
 from ..queue import number_queue, user_queue, bindings, blocked_numbers, IGNORED_TOPICS
@@ -106,6 +107,8 @@ async def update_queue_messages():
                     )
                 ),
             )
+        except MessageNotModified:
+            continue
         except Exception as e:
             logger.warning(
                 f"[ОШИБКА ОБНОВЛЕНИЯ ОЧЕРЕДИ] user_id={user['user_id']}: {e}"
@@ -255,6 +258,11 @@ async def handle_error_choice(call: types.CallbackQuery):
         )
     except Exception as e:
         logger.warning(f"[ОШИБКА ОПОВЕЩЕНИЯ ОШИБКИ] {e}")
+
+    queue_user = binding.get("queue_data")
+    if queue_user:
+        user_queue.append(queue_user)
+        await update_queue_messages()
 
     bindings.pop(str(msg_id), None)
     save_data()
@@ -501,6 +509,7 @@ async def try_dispatch_next():
             "user_id": user['user_id'],
             "text": number['text'],
             "added_at": number.get("added_at"),
+            "queue_data": user.copy(),
         }
 
         save_data()
