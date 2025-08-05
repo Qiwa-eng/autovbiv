@@ -6,6 +6,7 @@ user_queue = deque()
 bindings = {}
 blocked_numbers = {}
 IGNORED_TOPICS = set()
+contact_requests = {}
 
 # Locks for async-safe operations on queues
 number_queue_lock = asyncio.Lock()

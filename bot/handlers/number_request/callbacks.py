@@ -8,6 +8,7 @@ from ...queue import (
     user_queue,
     bindings,
     blocked_numbers,
+    contact_requests,
     number_queue_lock,
     user_queue_lock,
 )
@@ -62,6 +63,26 @@ async def handle_skip_number(call: types.CallbackQuery):
     await try_dispatch_next()
 
 
+@dp.callback_query_handler(lambda c: c.data == "contact_drop")
+async def handle_contact_drop(call: types.CallbackQuery):
+    msg_id = call.message.message_id
+    binding = bindings.get(str(msg_id))
+
+    if not binding:
+        return await call.answer("⚠️ Номер не найден или уже обработан.", show_alert=True)
+
+    drop_id = binding.get("drop_id")
+    if not drop_id:
+        return await call.answer("⚠️ Невозможно связаться с дропом.", show_alert=True)
+
+    contact_requests[call.from_user.id] = {
+        "drop_id": drop_id,
+        "number": binding.get("text"),
+    }
+    await call.message.reply("Введите ваше сообщение либо фото:")
+    await call.answer()
+
+
 @dp.callback_query_handler(lambda c: c.data in ["error_ban", "error_noban"])
 async def handle_error_choice(call: types.CallbackQuery):
     msg_id = call.message.message_id
@@ -107,6 +128,28 @@ async def handle_error_choice(call: types.CallbackQuery):
     bindings.pop(str(msg_id), None)
     save_data()
     await try_dispatch_next()
+
+
+@dp.message_handler(lambda msg: msg.from_user.id in contact_requests, content_types=types.ContentTypes.ANY)
+async def forward_contact_message(msg: types.Message):
+    info = contact_requests.pop(msg.from_user.id)
+    drop_id = info["drop_id"]
+    number = info.get("number")
+
+    try:
+        if msg.photo:
+            caption = f"По номеру {number} от пользователя {msg.from_user.id}\n{msg.caption or ''}"
+            await bot.send_photo(drop_id, msg.photo[-1].file_id, caption=caption)
+        elif msg.text:
+            text = f"Сообщение по номеру {number} от пользователя {msg.from_user.id}:\n{msg.text}"
+            await bot.send_message(drop_id, text)
+        else:
+            await msg.reply("⚠️ Поддерживаются только текст и фото.")
+            return
+        await msg.reply("✅ Сообщение отправлено дропу.")
+    except Exception as e:
+        logger.warning(f"[ОШИБКА ОТПРАВКИ ДРОПУ] {e}")
+        await msg.reply("⚠️ Не удалось отправить сообщение дропу.")
 
 
 @dp.callback_query_handler(lambda c: c.data == "leave_queue")
