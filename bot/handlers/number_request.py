@@ -105,7 +105,10 @@ async def handle_number_request(msg: types.Message):
                     "notify_msg_id": notify.message_id,
                 }
             )
-            logger.debug(f"[ОЧЕРЕДЬ] размер: {len(user_queue)}")
+            queue_len = len(user_queue)
+            logger.debug(f"[ОЧЕРЕДЬ] размер: {queue_len}")
+            if queue_len > 10:
+                logger.critical(f"[ОЧЕРЕДЬ] слишком много ожидающих: {queue_len}")
 
         save_data()
         await try_dispatch_next()
