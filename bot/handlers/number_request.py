@@ -22,22 +22,33 @@ from ..utils import phone_pattern, get_number_action_keyboard, fetch_russian_jok
 
 @dp.message_handler(lambda msg: msg.text and msg.text.lower() == "номер")
 async def handle_number_request(msg: types.Message):
+    logger.info(
+        f"[ЗАПРОС НОМЕРА] user_id={msg.from_user.id} chat_id={msg.chat.id} topic={msg.message_thread_id}"
+    )
     if msg.chat.type == "private":
+        logger.debug(f"[ЗАПРОС НОМЕРА] user_id={msg.from_user.id} в приватном чате")
         return await msg.reply(
             "❌ Команда <b>номер</b> работает только в группе.", parse_mode="HTML"
         )
 
     if msg.message_thread_id in IGNORED_TOPICS:
+        logger.debug(
+            f"[ЗАПРОС НОМЕРА] тема {msg.message_thread_id} в списке игнора"
+        )
         return await msg.reply(
             "⚠️ В этой теме бот не работает. Активируйте её командой /work."
         )
 
     if msg.chat.id not in GROUP2_IDS:
+        logger.debug(f"[ЗАПРОС НОМЕРА] чат {msg.chat.id} не разрешён")
         return
 
     async with user_queue_lock:
         for entry in user_queue:
             if entry['user_id'] == msg.from_user.id:
+                logger.debug(
+                    f"[ЗАПРОС НОМЕРА] user_id={msg.from_user.id} уже в очереди"
+                )
                 return await msg.reply("⚠️ Вы уже в очереди на номер.")
 
     async with number_queue_lock:
@@ -75,6 +86,7 @@ async def handle_number_request(msg: types.Message):
     else:
         async with user_queue_lock:
             position = len(user_queue) + 1
+        logger.info(f"[ОЧЕРЕДЬ] user_id={msg.from_user.id} позиция {position}")
         notify = await msg.reply(
             f"⏳ <b>Свободных номеров нет.</b>\nВаша позиция в очереди: <b>{position}</b>",
             parse_mode="HTML",
@@ -93,6 +105,7 @@ async def handle_number_request(msg: types.Message):
                     "notify_msg_id": notify.message_id,
                 }
             )
+            logger.debug(f"[ОЧЕРЕДЬ] размер: {len(user_queue)}")
 
         save_data()
         await try_dispatch_next()
@@ -113,6 +126,7 @@ async def error_reason_menu(call: types.CallbackQuery):
 
 
 async def update_queue_messages():
+    logger.debug("[ОЧЕРЕДЬ] обновление сообщений")
     for idx, user in enumerate(sorted(user_queue, key=lambda x: x["timestamp"])):
         try:
             position = idx + 1
@@ -131,6 +145,9 @@ async def update_queue_messages():
                 ),
             )
         except MessageNotModified:
+            logger.debug(
+                f"[ОЧЕРЕДЬ] сообщение {user['notify_msg_id']} без изменений"
+            )
             continue
         except Exception as e:
             logger.warning(

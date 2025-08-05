@@ -15,7 +15,10 @@ GROUP1_ID = int(getenv("GROUP1_ID", "0"))
 GROUP2_IDS = [int(x) for x in getenv("GROUP2_IDS", "").split(",") if x]
 TOPIC_IDS_GROUP1 = [int(x) for x in getenv("TOPIC_IDS_GROUP1", "").split(",") if x]
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 bot = Bot(token=API_TOKEN, parse_mode=types.ParseMode.HTML)
