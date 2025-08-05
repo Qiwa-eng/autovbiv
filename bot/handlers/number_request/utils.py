@@ -14,6 +14,7 @@ from ...queue import (
     IGNORED_TOPICS,
     number_queue_lock,
     user_queue_lock,
+    contact_bindings,
 )
 from ... import queue as queue_state
 from ...storage import save_data, save_history, history, issued_numbers
@@ -69,7 +70,7 @@ async def handle_photo_response(msg: types.Message):
             reply_to_message_id=binding['orig_msg_id'],
         )
 
-        await msg.reply("✅ Код был успешно отправлен")
+        await msg.reply("✅ Номер обработан")
 
         added_at = binding.get("added_at")
         if added_at:
@@ -185,6 +186,10 @@ async def try_dispatch_next():
             "text": number['text'],
             "added_at": number.get("added_at"),
             "queue_data": user.copy(),
+        }
+        contact_bindings[str(sent.message_id)] = {
+            "drop_id": number.get("drop_id"),
+            "text": number['text'],
         }
         issued_numbers.append(number["text"])
         save_data()

@@ -23,6 +23,7 @@ from ...queue import (
     IGNORED_TOPICS,
     number_queue_lock,
     user_queue_lock,
+    contact_bindings,
 )
 from ... import queue as queue_state
 from ...storage import save_data, QUEUE_FILE
@@ -103,6 +104,7 @@ async def handle_clear_queue(msg: types.Message):
     async with user_queue_lock:
         user_queue.clear()
     bindings.clear()
+    contact_bindings.clear()
     save_data()
 
     for topic_id in TOPIC_IDS_GROUP1:

@@ -2,7 +2,7 @@ import json
 import os
 from collections import deque
 
-from .queue import number_queue, user_queue, bindings, IGNORED_TOPICS
+from .queue import number_queue, user_queue, bindings, IGNORED_TOPICS, contact_bindings
 from .config import logger
 
 QUEUE_FILE = 'number_queue.json'
@@ -11,6 +11,7 @@ BINDINGS_FILE = 'bindings.json'
 HISTORY_FILE = 'history.json'
 IGNORED_FILE = 'ignored_topics.json'
 ISSUED_FILE = 'issued_numbers.json'
+CONTACT_FILE = 'contact_bindings.json'
 
 history = []
 issued_numbers = []
@@ -27,13 +28,16 @@ def save_data():
         json.dump(list(IGNORED_TOPICS), f)
     with open(ISSUED_FILE, 'w') as f:
         json.dump(issued_numbers, f)
+    with open(CONTACT_FILE, 'w') as f:
+        json.dump(contact_bindings, f)
     logger.info(
-        "[SAVE] numbers=%d users=%d bindings=%d ignored=%d issued=%d",
+        "[SAVE] numbers=%d users=%d bindings=%d ignored=%d issued=%d contacts=%d",
         len(number_queue),
         len(user_queue),
         len(bindings),
         len(IGNORED_TOPICS),
         len(issued_numbers),
+        len(contact_bindings),
     )
 
 
@@ -53,13 +57,17 @@ def load_data():
     if os.path.exists(ISSUED_FILE):
         with open(ISSUED_FILE, 'r') as f:
             issued_numbers.extend(json.load(f))
+    if os.path.exists(CONTACT_FILE):
+        with open(CONTACT_FILE, 'r') as f:
+            contact_bindings.update(json.load(f))
     logger.info(
-        "[LOAD] numbers=%d users=%d bindings=%d ignored=%d issued=%d",
+        "[LOAD] numbers=%d users=%d bindings=%d ignored=%d issued=%d contacts=%d",
         len(number_queue),
         len(user_queue),
         len(bindings),
         len(IGNORED_TOPICS),
         len(issued_numbers),
+        len(contact_bindings),
     )
 
 

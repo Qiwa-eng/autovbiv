@@ -14,6 +14,7 @@ from ...queue import (
     IGNORED_TOPICS,
     number_queue_lock,
     user_queue_lock,
+    contact_bindings,
 )
 from ... import queue as queue_state
 from ...storage import save_data, history, issued_numbers
@@ -80,8 +81,13 @@ async def handle_number_request(msg: types.Message):
             "topic_id": number['topic_id'],
             "group_id": number['from_group_id'],
             "user_id": msg.from_user.id,
+            "drop_id": number.get("drop_id"),
             "text": number['text'],
             "added_at": number.get("added_at"),
+        }
+        contact_bindings[str(sent.message_id)] = {
+            "drop_id": number.get("drop_id"),
+            "text": number['text'],
         }
         issued_numbers.append(number["text"])
         save_data()
@@ -164,6 +170,7 @@ async def handle_number_sources(msg: types.Message):
                         "topic_id": msg.message_thread_id,
                         "text": msg.text,
                         "from_group_id": msg.chat.id,
+                        "drop_id": msg.from_user.id,
                         "added_at": datetime.utcnow().timestamp(),
                     }
                 )
