@@ -237,12 +237,24 @@ async def handle_error_choice(call: types.CallbackQuery):
         await call.message.edit_text(
             "❌ Номер удалён.\n⛔ Заблокирован на 30 минут (моментальная ошибка)."
         )
+        reason = "моментальная ошибка"
         logger.info(f"[ОШИБКА С БАНОМ] {number_text} → user_id={user_id}")
     else:
         await call.message.edit_text(
             "❌ Номер удалён.\n⌛ Без блокировки (не пришёл код)."
         )
+        reason = "не пришёл код"
         logger.info(f"[ОШИБКА БЕЗ БАНА] {number_text} → user_id={user_id}")
+
+    try:
+        await bot.send_message(
+            chat_id=binding["group_id"],
+            message_thread_id=binding["topic_id"],
+            reply_to_message_id=binding["orig_msg_id"],
+            text=f"⚠️ Пользователь сообщил об ошибке: {reason}",
+        )
+    except Exception as e:
+        logger.warning(f"[ОШИБКА ОПОВЕЩЕНИЯ ОШИБКИ] {e}")
 
     bindings.pop(str(msg_id), None)
     save_data()
@@ -285,6 +297,21 @@ async def handle_number_sources(msg: types.Message):
             return
 
         number_text = match.group(0)
+
+        blocked_until = blocked_numbers.get(number_text)
+        now_ts = datetime.utcnow().timestamp()
+        if blocked_until:
+            if blocked_until > now_ts:
+                await bot.send_message(
+                    chat_id=msg.chat.id,
+                    message_thread_id=msg.message_thread_id,
+                    reply_to_message_id=msg.message_id,
+                    text="⛔ Этот номер временно заблокирован",
+                )
+                logger.info(f"[ЗАБЛОКИРОВАННЫЙ НОМЕР] {number_text}")
+                return
+            else:
+                blocked_numbers.pop(number_text, None)
 
         for item in number_queue:
             if number_text in item.get("text", ""):
@@ -463,6 +490,8 @@ async def try_dispatch_next():
             )
         except Exception as e:
             logger.warning(f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: {e}")
+            user_queue.appendleft(user)
+            await update_queue_messages()
             continue
 
         bindings[str(sent.message_id)] = {
