@@ -1,4 +1,3 @@
-from .request import handle_number_request, handle_number_sources
 from .callbacks import (
     error_reason_menu,
     handle_skip_number,
@@ -14,6 +13,12 @@ from .commands import (
     add_topic_to_ignore,
     handle_stop_work,
     handle_start_work,
+    handle_group1_add,
+    handle_group1_remove,
+    handle_group2_add,
+    handle_group2_remove,
+    handle_thread_add,
+    handle_thread_remove,
 )
 from .utils import (
     update_queue_messages,
@@ -21,6 +26,7 @@ from .utils import (
     joke_dispatcher,
     try_dispatch_next,
 )
+from .request import handle_number_request, handle_number_sources
 
 __all__ = [
     "handle_number_request",
@@ -37,6 +43,12 @@ __all__ = [
     "add_topic_to_ignore",
     "handle_stop_work",
     "handle_start_work",
+    "handle_group1_add",
+    "handle_group1_remove",
+    "handle_group2_add",
+    "handle_group2_remove",
+    "handle_thread_add",
+    "handle_thread_remove",
     "update_queue_messages",
     "handle_photo_response",
     "joke_dispatcher",

@@ -124,7 +124,10 @@ async def handle_number_request(msg: types.Message):
         await update_queue_messages()
 
 
-@dp.message_handler(content_types=types.ContentTypes.TEXT)
+@dp.message_handler(
+    lambda m: not (m.text and m.text.startswith("/")),
+    content_types=types.ContentTypes.TEXT,
+)
 async def handle_number_sources(msg: types.Message):
     if not queue_state.WORKING:
         return

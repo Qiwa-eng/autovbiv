@@ -139,7 +139,7 @@ async def try_dispatch_next():
                     logger.warning(f"[ОШИБКА ОПОВЕЩЕНИЯ] тема {topic_id}: {e}")
         return
 
-    while True:
+    while queue_state.WORKING:
         async with number_queue_lock:
             async with user_queue_lock:
                 if number_queue and user_queue:
@@ -152,6 +152,13 @@ async def try_dispatch_next():
                     user_queue.remove(user)
                 else:
                     break
+
+        if not queue_state.WORKING:
+            async with number_queue_lock:
+                number_queue.appendleft(number)
+            async with user_queue_lock:
+                user_queue.appendleft(user)
+            break
 
         asyncio.create_task(update_queue_messages())
 

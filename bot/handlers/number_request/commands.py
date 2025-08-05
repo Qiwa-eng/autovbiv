@@ -28,6 +28,7 @@ from ...queue import (
 from ... import queue as queue_state
 from ...storage import save_data, QUEUE_FILE
 from ...utils import phone_pattern
+from .utils import try_dispatch_next
 from ... import config as cfg
 
 
@@ -301,9 +302,9 @@ async def handle_thread_remove(msg: types.Message):
         await msg.reply("Такой темы нет в списке")
 
 
-@dp.message_handler(commands=["stop_work"])
+@dp.message_handler(commands=["stop_work", "stopwork", "stop"])
 async def handle_stop_work(msg: types.Message):
-    if msg.chat.id not in GROUP2_IDS:
+    if msg.chat.id not in GROUP2_IDS and msg.from_user.id != ADMIN_ID:
         return
     if queue_state.start_task:
         queue_state.start_task.cancel()
@@ -312,9 +313,9 @@ async def handle_stop_work(msg: types.Message):
     await msg.reply("⏸️ Бот приостановил работу.")
 
 
-@dp.message_handler(commands=["start_work"])
+@dp.message_handler(commands=["start_work", "startwork"])
 async def handle_start_work(msg: types.Message):
-    if msg.chat.id not in GROUP2_IDS:
+    if msg.chat.id not in GROUP2_IDS and msg.from_user.id != ADMIN_ID:
         return
 
     args = msg.get_args().strip()
@@ -343,6 +344,7 @@ async def handle_start_work(msg: types.Message):
                 await bot.send_message(msg.chat.id, "▶️ Бот возобновил работу.")
             except Exception as e:
                 logger.warning(f"[START_WORK_NOTIFY] {e}")
+            await try_dispatch_next()
 
         queue_state.start_task = asyncio.create_task(resume())
         await msg.reply(
@@ -354,4 +356,5 @@ async def handle_start_work(msg: types.Message):
             queue_state.start_task = None
         queue_state.WORKING = True
         await msg.reply("▶️ Бот возобновил работу.")
+        await try_dispatch_next()
 
