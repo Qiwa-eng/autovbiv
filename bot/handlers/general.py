@@ -27,15 +27,15 @@ async def cmd_help(msg: types.Message) -> None:
         "Доступные команды:\n"
         "/start — приветствие\n"
         "/help — список команд\n"
-        "/queue — ваша позиция в очереди\n"
+        "/queue (/очередь) — ваша позиция в очереди\n"
         "/leave — выйти из очереди\n"
-        "/joke — случайный анекдот",
+        "/joke (/анекдот) — случайный анекдот",
     )
 
 
-@dp.message_handler(commands=["queue"])
+@dp.message_handler(commands=["queue", "очередь"])
 async def cmd_queue(msg: types.Message) -> None:
-    logger.info(f"[CMD /queue] user_id={msg.from_user.id}")
+    logger.info(f"[CMD {msg.text}] user_id={msg.from_user.id}")
     async with user_queue_lock:
         sorted_users = sorted(user_queue, key=lambda u: u["timestamp"])
         for idx, user in enumerate(sorted_users):
@@ -67,16 +67,18 @@ async def cmd_leave(msg: types.Message) -> None:
         await msg.reply("⚠️ Вас нет в очереди.")
 
 
-@dp.message_handler(commands=["joke"])
+@dp.message_handler(commands=["joke", "анекдот"])
 async def cmd_joke(msg: types.Message) -> None:
-    logger.info(f"[CMD /joke] user_id={msg.from_user.id}")
+    logger.info(f"[CMD {msg.text}] user_id={msg.from_user.id}")
     joke = fetch_russian_joke()
     await msg.reply(f"<code>{escape(joke)}</code>", parse_mode="HTML")
 
 
+# Support multiple language variations for the stats command
 @dp.message_handler(commands=["stats"])
 @dp.message_handler(
-    lambda m: m.text and m.text.lower().startswith("/статистика")
+    lambda m: m.text
+    and m.text.lower().startswith( ("/стат", "/stat") )
 )
 async def cmd_stats(msg: types.Message) -> None:
     logger.info(f"[CMD {msg.text}] user_id={msg.from_user.id}")
