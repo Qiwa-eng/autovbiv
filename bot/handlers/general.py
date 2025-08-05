@@ -74,9 +74,12 @@ async def cmd_joke(msg: types.Message) -> None:
     await msg.reply(f"<code>{escape(joke)}</code>", parse_mode="HTML")
 
 
-@dp.message_handler(commands=["статистика"])
+@dp.message_handler(commands=["stats"])
+@dp.message_handler(
+    lambda m: m.text and m.text.lower().startswith("/статистика")
+)
 async def cmd_stats(msg: types.Message) -> None:
-    logger.info(f"[CMD /статистика] user_id={msg.from_user.id}")
+    logger.info(f"[CMD {msg.text}] user_id={msg.from_user.id}")
     await msg.reply(
         f"\U0001F4CA Всего выдано номеров: <b>{len(issued_numbers)}</b>",
         parse_mode="HTML",
