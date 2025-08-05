@@ -2,7 +2,8 @@ import asyncio
 
 from .config import dp
 from .storage import load_data, load_history
-from .handlers import number_request, general
+# Import general handlers before number_request so command handlers register first
+from .handlers import general, number_request
 
 load_data()
 load_history()
