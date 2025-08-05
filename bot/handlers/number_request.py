@@ -417,9 +417,13 @@ async def handle_number_sources(msg: types.Message):
                 blocked_numbers.pop(number_text, None)
 
         async with number_queue_lock:
-            duplicate = any(
+            duplicate_in_queue = any(
                 number_text in item.get("text", "") for item in number_queue
             )
+            duplicate_in_bindings = any(
+                number_text in item.get("text", "") for item in bindings.values()
+            )
+            duplicate = duplicate_in_queue or duplicate_in_bindings
             if not duplicate:
                 number_queue.append(
                     {
@@ -435,9 +439,9 @@ async def handle_number_sources(msg: types.Message):
                 chat_id=msg.chat.id,
                 message_thread_id=msg.message_thread_id,
                 reply_to_message_id=msg.message_id,
-                text="⚠️ Такой номер уже в очереди",
+                text="⚠️ Такой номер уже в очереди или выдан",
             )
-            logger.info(f"[ДУБЛИКАТ В ОЧЕРЕДИ] {number_text}")
+            logger.info(f"[ДУБЛИКАТ] {number_text}")
             return
 
         save_data()
