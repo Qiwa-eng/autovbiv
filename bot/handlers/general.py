@@ -1,4 +1,5 @@
 from aiogram import types
+from html import escape
 
 from ..config import dp, logger
 from ..queue import user_queue, user_queue_lock
@@ -68,4 +69,4 @@ async def cmd_leave(msg: types.Message) -> None:
 async def cmd_joke(msg: types.Message) -> None:
     logger.info(f"[CMD /joke] user_id={msg.from_user.id}")
     joke = fetch_russian_joke()
-    await msg.reply(f"<code>{joke}</code>", parse_mode="HTML")
+    await msg.reply(f"<code>{escape(joke)}</code>", parse_mode="HTML")
