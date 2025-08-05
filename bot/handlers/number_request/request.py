@@ -5,8 +5,8 @@ from html import escape
 
 from aiogram import types
 
-from ..config import dp, bot, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1, logger
-from ..queue import (
+from ...config import dp, bot, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1, logger
+from ...queue import (
     number_queue,
     user_queue,
     bindings,
@@ -15,8 +15,8 @@ from ..queue import (
     number_queue_lock,
     user_queue_lock,
 )
-from ..storage import save_data, history, issued_numbers
-from ..utils import phone_pattern, get_number_action_keyboard
+from ...storage import save_data, history, issued_numbers
+from ...utils import phone_pattern, get_number_action_keyboard
 from .utils import update_queue_messages, try_dispatch_next
 
 

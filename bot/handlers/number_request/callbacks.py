@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 
 from aiogram import types
 
-from ..config import dp, bot, GROUP2_IDS, logger
-from ..queue import (
+from ...config import dp, bot, GROUP2_IDS, logger
+from ...queue import (
     number_queue,
     user_queue,
     bindings,
@@ -11,7 +11,7 @@ from ..queue import (
     number_queue_lock,
     user_queue_lock,
 )
-from ..storage import save_data
+from ...storage import save_data
 from .utils import update_queue_messages, try_dispatch_next
 
 
