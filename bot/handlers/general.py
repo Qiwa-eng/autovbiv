@@ -1,9 +1,11 @@
 from aiogram import types
+from aiogram.types import InputFile
 from html import escape
+import os
 
 from ..config import dp, logger
 from ..queue import user_queue, user_queue_lock
-from ..storage import save_data
+from ..storage import save_data, issued_numbers
 from ..utils import fetch_russian_joke
 from .number_request import update_queue_messages
 
@@ -70,3 +72,28 @@ async def cmd_joke(msg: types.Message) -> None:
     logger.info(f"[CMD /joke] user_id={msg.from_user.id}")
     joke = fetch_russian_joke()
     await msg.reply(f"<code>{escape(joke)}</code>", parse_mode="HTML")
+
+
+@dp.message_handler(commands=["статистика"])
+async def cmd_stats(msg: types.Message) -> None:
+    logger.info(f"[CMD /статистика] user_id={msg.from_user.id}")
+    await msg.reply(
+        f"\U0001F4CA Всего выдано номеров: <b>{len(issued_numbers)}</b>",
+        parse_mode="HTML",
+    )
+
+
+@dp.message_handler(commands=["выгруз"])
+async def cmd_dump(msg: types.Message) -> None:
+    logger.info(f"[CMD /выгруз] user_id={msg.from_user.id}")
+    if not issued_numbers:
+        await msg.reply("⚠️ Номеров ещё не выдавалось.")
+        return
+    path = "issued_numbers.txt"
+    with open(path, "w") as f:
+        f.write("\n".join(issued_numbers))
+    await msg.reply_document(InputFile(path), caption=f"Всего: {len(issued_numbers)}")
+    try:
+        os.remove(path)
+    except Exception:
+        pass
