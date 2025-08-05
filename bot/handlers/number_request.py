@@ -131,16 +131,62 @@ async def update_queue_messages():
 
 @dp.message_handler(commands=["work"])
 async def remove_topic_from_ignore(msg: types.Message):
-    if msg.is_topic_message:
+    if msg.message_thread_id is not None:
         if msg.message_thread_id in IGNORED_TOPICS:
             IGNORED_TOPICS.remove(msg.message_thread_id)
             await msg.reply(
                 "✅ Эта тема снова активна. Бот теперь реагирует на номера."
             )
+            save_data()
         else:
             await msg.reply("ℹ️ Эта тема и так уже активна.")
     else:
         await msg.reply("⚠️ Команду можно использовать только в теме.")
+
+
+@dp.message_handler(commands=["удалить", "delete"])
+async def remove_number_from_queue(msg: types.Message):
+    if msg.chat.id not in {GROUP1_ID, *GROUP2_IDS}:
+        return
+
+    target_id = None
+    number_text = None
+
+    if msg.reply_to_message:
+        target_id = msg.reply_to_message.message_id
+        match = phone_pattern.search(msg.reply_to_message.text or "")
+        if match:
+            number_text = match.group(0)
+
+    if not number_text:
+        match = phone_pattern.search(msg.get_args())
+        if match:
+            number_text = match.group(0)
+
+    removed = False
+    async with number_queue_lock:
+        for item in list(number_queue):
+            if (
+                (target_id and item.get("message_id") == target_id)
+                or (number_text and number_text in item.get("text", ""))
+            ):
+                number_queue.remove(item)
+                removed = True
+                if not number_text:
+                    match = phone_pattern.search(item.get("text", ""))
+                    if match:
+                        number_text = match.group(0)
+                break
+
+    if removed:
+        save_data()
+        await msg.reply(
+            f"✅ Номер <code>{number_text}</code> удалён из очереди.",
+            parse_mode="HTML",
+        )
+        logger.info(f"[УДАЛЕНИЕ] {number_text} → user_id={msg.from_user.id}")
+    else:
+        await msg.reply("⚠️ Номер не найден в очереди.")
 
 
 @dp.message_handler(commands=["очистить"])
@@ -301,8 +347,9 @@ async def handle_id_command(msg: types.Message):
 
 @dp.message_handler(commands=["nework"])
 async def add_topic_to_ignore(msg: types.Message):
-    if msg.is_topic_message:
+    if msg.message_thread_id is not None:
         IGNORED_TOPICS.add(msg.message_thread_id)
+        save_data()
         await msg.reply(
             "✅ Эта тема теперь исключена. Бот не будет здес реагировать на номера."
         )
