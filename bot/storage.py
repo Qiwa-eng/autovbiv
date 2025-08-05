@@ -10,8 +10,10 @@ USER_FILE = 'user_queue.json'
 BINDINGS_FILE = 'bindings.json'
 HISTORY_FILE = 'history.json'
 IGNORED_FILE = 'ignored_topics.json'
+ISSUED_FILE = 'issued_numbers.json'
 
 history = []
+issued_numbers = []
 
 
 def save_data():
@@ -23,12 +25,15 @@ def save_data():
         json.dump(bindings, f)
     with open(IGNORED_FILE, 'w') as f:
         json.dump(list(IGNORED_TOPICS), f)
+    with open(ISSUED_FILE, 'w') as f:
+        json.dump(issued_numbers, f)
     logger.info(
-        "[SAVE] numbers=%d users=%d bindings=%d ignored=%d",
+        "[SAVE] numbers=%d users=%d bindings=%d ignored=%d issued=%d",
         len(number_queue),
         len(user_queue),
         len(bindings),
         len(IGNORED_TOPICS),
+        len(issued_numbers),
     )
 
 
@@ -45,12 +50,16 @@ def load_data():
     if os.path.exists(IGNORED_FILE):
         with open(IGNORED_FILE, 'r') as f:
             IGNORED_TOPICS.update(json.load(f))
+    if os.path.exists(ISSUED_FILE):
+        with open(ISSUED_FILE, 'r') as f:
+            issued_numbers.extend(json.load(f))
     logger.info(
-        "[LOAD] numbers=%d users=%d bindings=%d ignored=%d",
+        "[LOAD] numbers=%d users=%d bindings=%d ignored=%d issued=%d",
         len(number_queue),
         len(user_queue),
         len(bindings),
         len(IGNORED_TOPICS),
+        len(issued_numbers),
     )
 
 

@@ -17,7 +17,15 @@ from ..queue import (
     number_queue_lock,
     user_queue_lock,
 )
-from ..storage import save_data, load_data, load_history, save_history, history, QUEUE_FILE
+from ..storage import (
+    save_data,
+    load_data,
+    load_history,
+    save_history,
+    history,
+    issued_numbers,
+    QUEUE_FILE,
+)
 from ..utils import phone_pattern, get_number_action_keyboard, fetch_russian_joke
 
 
@@ -81,7 +89,7 @@ async def handle_number_request(msg: types.Message):
             "text": number['text'],
             "added_at": number.get("added_at"),
         }
-
+        issued_numbers.append(number["text"])
         save_data()
         logger.info(f"[ВЫДАН НОМЕР] {number['text']} → user_id={msg.from_user.id}")
     else:
@@ -631,7 +639,7 @@ async def try_dispatch_next():
             "added_at": number.get("added_at"),
             "queue_data": user.copy(),
         }
-
+        issued_numbers.append(number["text"])
         save_data()
         logger.info(
             f"[АВТОВЫДАЧА] {number['text']} → user_id={user['user_id']}"
