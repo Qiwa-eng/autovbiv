@@ -1,4 +1,3 @@
-from .request import handle_number_request, handle_number_sources
 from .callbacks import (
     error_reason_menu,
     handle_skip_number,
@@ -21,6 +20,7 @@ from .utils import (
     joke_dispatcher,
     try_dispatch_next,
 )
+from .request import handle_number_request, handle_number_sources
 
 __all__ = [
     "handle_number_request",
