@@ -1,11 +1,11 @@
-import os
+from os import getenv
 import logging
 from aiogram import Bot, Dispatcher, types
 
-API_TOKEN = os.getenv('API_TOKEN', '')
-GROUP1_ID = int(os.getenv('GROUP1_ID', '0'))
-GROUP2_IDS = [int(x) for x in os.getenv('GROUP2_IDS', '').split(',') if x]
-TOPIC_IDS_GROUP1 = [int(x) for x in os.getenv('TOPIC_IDS_GROUP1', '').split(',') if x]
+API_TOKEN = getenv('API_TOKEN', '')
+GROUP1_ID = int(getenv('GROUP1_ID', '0'))
+GROUP2_IDS = [int(x) for x in getenv('GROUP2_IDS', '').split(',') if x]
+TOPIC_IDS_GROUP1 = [int(x) for x in getenv('TOPIC_IDS_GROUP1', '').split(',') if x]
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
