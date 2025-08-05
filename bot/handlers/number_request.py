@@ -2,6 +2,7 @@ import asyncio
 import os
 from datetime import datetime, timedelta
 from statistics import mean
+from html import escape
 
 from aiogram import types
 from aiogram.utils.exceptions import MessageNotModified
@@ -59,7 +60,7 @@ async def handle_number_request(msg: types.Message):
 
     if number:
         message_text = (
-            f"🎉 <b>Ваш номер:</b> <code>{number['text']}</code>\n\n"
+            f"🎉 <b>Ваш номер:</b> <code>{escape(number['text'])}</code>\n\n"
             "✉️ <i>Ответьте на это сообщение и отправьте код.</i>\n"
             "⚠️ <b>Если есть проблема</b>, воспользуйтесь кнопкой ниже и приложите <u>скрин</u>."
         )
@@ -210,7 +211,7 @@ async def remove_number_from_queue(msg: types.Message):
     if removed:
         save_data()
         await msg.reply(
-            f"✅ Номер <code>{number_text}</code> удалён из очереди.",
+            f"✅ Номер <code>{escape(number_text)}</code> удалён из очереди.",
             parse_mode="HTML",
         )
         logger.info(f"[УДАЛЕНИЕ] {number_text} → user_id={msg.from_user.id}")
@@ -456,7 +457,7 @@ async def handle_number_sources(msg: types.Message):
             chat_id=msg.chat.id,
             message_thread_id=msg.message_thread_id,
             reply_to_message_id=msg.message_id,
-            text=f"✅ Взял номер\n\n⏱ Примерное ожидание кода: <b>{estimate}</b>",
+            text=f"✅ Взял номер\n\n⏱ Примерное ожидание кода: <b>{escape(estimate)}</b>",
             parse_mode="HTML",
         )
 
@@ -549,7 +550,7 @@ async def joke_dispatcher():
                 try:
                     await bot.send_message(
                         chat_id=user["chat_id"],
-                        text=f"🕓 Пока вы ждёте, вот вам анекдот:\n\n<code>{joke}</code>",
+                        text=f"🕓 Пока вы ждёте, вот вам анекдот:\n\n<code>{escape(joke)}</code>",
                         parse_mode="HTML",
                         reply_to_message_id=user.get("request_msg_id"),
                     )
@@ -598,7 +599,7 @@ async def try_dispatch_next():
         await update_queue_messages()
 
         message_text = (
-            f"🎉 <b>Ваш номер:</b> <code>{number['text']}</code>\n\n"
+            f"🎉 <b>Ваш номер:</b> <code>{escape(number['text'])}</code>\n\n"
             "✉️ <i>Ответьте на это сообщение и отправьте код.</i>\n"
             "⚠️ <b>Если есть проблема</b>, воспользуйтесь кнопкой ниже и приложите <u>скрин</u>."
         )
