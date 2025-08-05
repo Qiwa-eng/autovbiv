@@ -1,4 +1,5 @@
-from bot.config import dp, logger
+from bot import dp
+from bot.config import logger
 from aiogram import executor
 
 if __name__ == "__main__":
