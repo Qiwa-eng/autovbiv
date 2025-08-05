@@ -15,6 +15,7 @@ from ...queue import (
     number_queue_lock,
     user_queue_lock,
 )
+from ... import queue as queue_state
 from ...storage import save_data, history, issued_numbers
 from ...utils import phone_pattern, get_number_action_keyboard
 from .utils import update_queue_messages, try_dispatch_next
@@ -25,6 +26,8 @@ async def handle_number_request(msg: types.Message):
     logger.info(
         f"[ЗАПРОС НОМЕРА] user_id={msg.from_user.id} chat_id={msg.chat.id} topic={msg.message_thread_id}"
     )
+    if not queue_state.WORKING:
+        return await msg.reply("⏸️ Бот сейчас не выдаёт номера.")
     if msg.chat.type == "private":
         logger.debug(f"[ЗАПРОС НОМЕРА] user_id={msg.from_user.id} в приватном чате")
         return await msg.reply(
@@ -117,6 +120,8 @@ async def handle_number_request(msg: types.Message):
 
 @dp.message_handler(content_types=types.ContentTypes.TEXT)
 async def handle_number_sources(msg: types.Message):
+    if not queue_state.WORKING:
+        return
     if msg.message_thread_id in IGNORED_TOPICS:
         return
     if msg.chat.type == "private":
