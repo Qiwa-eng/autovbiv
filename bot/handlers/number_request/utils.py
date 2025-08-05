@@ -14,6 +14,7 @@ from ...queue import (
     IGNORED_TOPICS,
     number_queue_lock,
     user_queue_lock,
+    contact_bindings,
 )
 from ... import queue as queue_state
 from ...storage import save_data, save_history, history, issued_numbers
@@ -57,9 +58,13 @@ async def handle_photo_response(msg: types.Message):
     if not msg.reply_to_message:
         return
 
-    binding = bindings.get(str(msg.reply_to_message.message_id))
+    msg_key = str(msg.reply_to_message.message_id)
+    binding = bindings.get(msg_key)
     if not binding:
         return
+
+    drop_id = binding.get("drop_id")
+    number = binding.get("text")
 
     try:
         await bot.send_photo(
@@ -89,7 +94,9 @@ async def handle_photo_response(msg: types.Message):
             "Пожалуйста, запросите новый номер — он не найден в чате с номерами.",
         )
     finally:
-        bindings.pop(str(msg.reply_to_message.message_id), None)
+        bindings.pop(msg_key, None)
+        if drop_id:
+            contact_bindings[msg_key] = {"drop_id": drop_id, "text": number}
         save_data()
 
 

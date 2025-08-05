@@ -4,6 +4,7 @@ import asyncio
 number_queue = deque()
 user_queue = deque()
 bindings = {}
+contact_bindings = {}
 blocked_numbers = {}
 IGNORED_TOPICS = set()
 contact_requests = {}
