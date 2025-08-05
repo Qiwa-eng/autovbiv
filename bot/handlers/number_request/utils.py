@@ -21,7 +21,9 @@ from ..utils import get_number_action_keyboard, fetch_russian_joke
 
 async def update_queue_messages():
     logger.debug("[ОЧЕРЕДЬ] обновление сообщений")
-    for idx, user in enumerate(sorted(user_queue, key=lambda x: x["timestamp"])):
+    async with user_queue_lock:
+        sorted_users = list(sorted(user_queue, key=lambda x: x["timestamp"]))
+    for idx, user in enumerate(sorted_users):
         try:
             position = idx + 1
             await bot.edit_message_text(
@@ -147,7 +149,7 @@ async def try_dispatch_next():
                 else:
                     break
 
-        await update_queue_messages()
+        asyncio.create_task(update_queue_messages())
 
         message_text = (
             f"🎉 <b>Ваш номер:</b> <code>{escape(number['text'])}</code>\n\n"
@@ -164,9 +166,12 @@ async def try_dispatch_next():
             )
         except Exception as e:
             logger.warning(f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: {e}")
+            async with number_queue_lock:
+                number_queue.appendleft(number)
             async with user_queue_lock:
                 user_queue.appendleft(user)
-            await update_queue_messages()
+            save_data()
+            asyncio.create_task(update_queue_messages())
             continue
 
         bindings[str(sent.message_id)] = {
