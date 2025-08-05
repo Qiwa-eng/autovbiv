@@ -9,11 +9,7 @@ from datetime import datetime
 from statistics import mean
 import asyncio
 
-API_TOKEN = '7625642691:AAFa41xZsEv2eFxqyoTZ6dTX4nfY6itgScw'
-GROUP1_ID = -1002816304860
-GROUP2_IDS = [-1002569933724, -1002514580090, -1002799832189, -1002554415803, -1002537566318]
-
-TOPIC_IDS_GROUP1 = [72295, 72290]
+from bot.config import API_TOKEN, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
