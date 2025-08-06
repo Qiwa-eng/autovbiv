@@ -109,8 +109,15 @@ async def handle_photo_response(msg: types.Message):
     finally:
         bindings.pop(msg_key, None)
         active_numbers.discard(number)
+        contact_info = {
+            "text": number,
+            "group_id": binding["group_id"],
+            "topic_id": binding["topic_id"],
+            "orig_msg_id": binding["orig_msg_id"],
+        }
         if drop_id:
-            contact_bindings[msg_key] = {"drop_id": drop_id, "text": number}
+            contact_info["drop_id"] = drop_id
+        contact_bindings[msg_key] = contact_info
         save_data()
 
 
