@@ -12,6 +12,7 @@ from ...queue import (
     contact_requests,
     number_queue_lock,
     user_queue_lock,
+    active_numbers,
 )
 from ...storage import save_data
 from .utils import update_queue_messages, try_dispatch_next
@@ -39,7 +40,7 @@ async def handle_skip_number(call: types.CallbackQuery):
     if not binding:
         return await call.answer("⚠️ Номер не найден или уже обработан.", show_alert=True)
 
-    number_text = binding["text"]
+    number_text = binding.get("number") or binding["text"]
 
     async with number_queue_lock:
         number_queue.append(
@@ -47,6 +48,7 @@ async def handle_skip_number(call: types.CallbackQuery):
                 "message_id": binding["orig_msg_id"],
                 "topic_id": binding["topic_id"],
                 "text": number_text,
+                "number": number_text,
                 "from_group_id": binding["group_id"],
                 "added_at": binding.get("added_at", datetime.utcnow().timestamp()),
             }
@@ -79,7 +81,7 @@ async def handle_contact_drop(call: types.CallbackQuery):
 
     contact_requests[call.from_user.id] = {
         "drop_id": drop_id,
-        "number": binding.get("text"),
+        "number": binding.get("number") or binding.get("text"),
     }
     await call.message.reply("Введите ваше сообщение либо фото:")
     await call.answer()
@@ -94,7 +96,7 @@ async def handle_error_choice(call: types.CallbackQuery):
     if not binding:
         return await call.answer("Номер уже обработан.", show_alert=True)
 
-    number_text = binding["text"]
+    number_text = binding.get("number") or binding["text"]
 
     if call.data == "error_ban":
         blocked_until = datetime.utcnow() + timedelta(minutes=30)
@@ -128,6 +130,7 @@ async def handle_error_choice(call: types.CallbackQuery):
         await update_queue_messages()
 
     bindings.pop(str(msg_id), None)
+    active_numbers.discard(number_text)
     save_data()
     await try_dispatch_next()
 

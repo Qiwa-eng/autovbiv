@@ -1,9 +1,11 @@
 import json
 import os
-from collections import deque
+import asyncio
+from datetime import datetime
 
-from .queue import number_queue, user_queue, bindings, IGNORED_TOPICS
+from .queue import number_queue, user_queue, bindings, IGNORED_TOPICS, active_numbers
 from .config import logger
+from .utils import phone_pattern
 
 QUEUE_FILE = 'number_queue.json'
 USER_FILE = 'user_queue.json'
@@ -15,8 +17,30 @@ ISSUED_FILE = 'issued_numbers.json'
 history = []
 issued_numbers = []
 
+_save_task = None
+_pending_save = False
+_SAVE_DELAY = 0.5
+
 
 def save_data():
+    """Schedule data persistence without blocking the event loop."""
+    global _save_task, _pending_save
+    _pending_save = True
+    loop = asyncio.get_event_loop()
+    if not _save_task or _save_task.done():
+        _save_task = loop.create_task(_delayed_save())
+
+
+async def _delayed_save():
+    global _pending_save
+    await asyncio.sleep(_SAVE_DELAY)
+    if not _pending_save:
+        return
+    _pending_save = False
+    await asyncio.to_thread(_write_data)
+
+
+def _write_data():
     with open(QUEUE_FILE, 'w') as f:
         json.dump(list(number_queue), f)
     with open(USER_FILE, 'w') as f:
@@ -40,13 +64,37 @@ def save_data():
 def load_data():
     if os.path.exists(QUEUE_FILE):
         with open(QUEUE_FILE, 'r') as f:
-            number_queue.extend(deque(json.load(f)))
+            for item in json.load(f):
+                if isinstance(item.get('timestamp'), str):
+                    item['timestamp'] = datetime.fromisoformat(item['timestamp']).timestamp()
+                number_queue.append(item)
+                num = item.get('number')
+                if not num:
+                    match = phone_pattern.search(item.get('text', ''))
+                    if match:
+                        num = match.group(0)
+                        item['number'] = num
+                if num:
+                    active_numbers.add(num)
     if os.path.exists(USER_FILE):
         with open(USER_FILE, 'r') as f:
-            user_queue.extend(deque(json.load(f)))
+            for item in json.load(f):
+                if isinstance(item.get('timestamp'), str):
+                    item['timestamp'] = datetime.fromisoformat(item['timestamp']).timestamp()
+                user_queue.append(item)
     if os.path.exists(BINDINGS_FILE):
         with open(BINDINGS_FILE, 'r') as f:
-            bindings.update(json.load(f))
+            loaded = json.load(f)
+            for key, value in loaded.items():
+                num = value.get('number')
+                if not num:
+                    match = phone_pattern.search(value.get('text', ''))
+                    if match:
+                        num = match.group(0)
+                        value['number'] = num
+                if num:
+                    active_numbers.add(num)
+            bindings.update(loaded)
     if os.path.exists(IGNORED_FILE):
         with open(IGNORED_FILE, 'r') as f:
             IGNORED_TOPICS.update(json.load(f))

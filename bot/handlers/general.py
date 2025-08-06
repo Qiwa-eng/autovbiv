@@ -37,8 +37,7 @@ async def cmd_help(msg: types.Message) -> None:
 async def cmd_queue(msg: types.Message) -> None:
     logger.info(f"[CMD {msg.text}] user_id={msg.from_user.id}")
     async with user_queue_lock:
-        sorted_users = sorted(user_queue, key=lambda u: u["timestamp"])
-        for idx, user in enumerate(sorted_users):
+        for idx, user in enumerate(user_queue):
             if user["user_id"] == msg.from_user.id:
                 await msg.reply(
                     f"⏳ Ваша позиция в очереди: <b>{idx + 1}</b>",

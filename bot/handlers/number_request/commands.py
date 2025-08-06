@@ -23,6 +23,7 @@ from ...queue import (
     IGNORED_TOPICS,
     number_queue_lock,
     user_queue_lock,
+    active_numbers,
 )
 from ... import queue as queue_state
 from ...storage import save_data, QUEUE_FILE
@@ -73,7 +74,7 @@ async def remove_number_from_queue(msg: types.Message):
         for item in list(number_queue):
             if (
                 (target_id and item.get("message_id") == target_id)
-                or (number_text and number_text in item.get("text", ""))
+                or (number_text and (number_text == item.get("number") or number_text in item.get("text", "")))
             ):
                 number_queue.remove(item)
                 removed = True
@@ -81,6 +82,7 @@ async def remove_number_from_queue(msg: types.Message):
                     match = phone_pattern.search(item.get("text", ""))
                     if match:
                         number_text = match.group(0)
+                active_numbers.discard(item.get("number") or number_text)
                 break
 
     if removed:
@@ -104,6 +106,7 @@ async def handle_clear_queue(msg: types.Message):
     async with user_queue_lock:
         user_queue.clear()
     bindings.clear()
+    active_numbers.clear()
     save_data()
 
     for topic_id in TOPIC_IDS_GROUP1:
