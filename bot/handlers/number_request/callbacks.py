@@ -75,14 +75,15 @@ async def handle_contact_drop(call: types.CallbackQuery):
     if not binding:
         return await call.answer("⚠️ Номер не найден или уже обработан.", show_alert=True)
 
-    drop_id = binding.get("drop_id")
-    if not drop_id:
-        return await call.answer("⚠️ Невозможно связаться с дропом.", show_alert=True)
-
     contact_requests[call.from_user.id] = {
-        "drop_id": drop_id,
         "number": binding.get("number") or binding.get("text"),
+        "group_id": binding.get("group_id"),
+        "topic_id": binding.get("topic_id"),
+        "orig_msg_id": binding.get("orig_msg_id"),
     }
+    drop_id = binding.get("drop_id")
+    if drop_id:
+        contact_requests[call.from_user.id]["drop_id"] = drop_id
     await call.message.reply("Введите ваше сообщение либо фото:")
     await call.answer()
 
@@ -138,23 +139,36 @@ async def handle_error_choice(call: types.CallbackQuery):
 @dp.message_handler(lambda msg: msg.from_user.id in contact_requests, content_types=types.ContentTypes.ANY)
 async def forward_contact_message(msg: types.Message):
     info = contact_requests.pop(msg.from_user.id)
-    drop_id = info["drop_id"]
     number = info.get("number")
+    group_id = info.get("group_id")
+    topic_id = info.get("topic_id")
+    orig_msg_id = info.get("orig_msg_id")
 
     try:
         if msg.photo:
             caption = f"По номеру {number} от пользователя {msg.from_user.id}\n{msg.caption or ''}"
-            await bot.send_photo(drop_id, msg.photo[-1].file_id, caption=caption)
+            await bot.send_photo(
+                chat_id=group_id,
+                photo=msg.photo[-1].file_id,
+                caption=caption,
+                message_thread_id=topic_id,
+                reply_to_message_id=orig_msg_id,
+            )
         elif msg.text:
             text = f"Сообщение по номеру {number} от пользователя {msg.from_user.id}:\n{msg.text}"
-            await bot.send_message(drop_id, text)
+            await bot.send_message(
+                chat_id=group_id,
+                text=text,
+                message_thread_id=topic_id,
+                reply_to_message_id=orig_msg_id,
+            )
         else:
             await msg.reply("⚠️ Поддерживаются только текст и фото.")
             return
-        await msg.reply("✅ Сообщение отправлено дропу.")
+        await msg.reply("✅ Сообщение отправлено в группу.")
     except Exception as e:
-        logger.warning(f"[ОШИБКА ОТПРАВКИ ДРОПУ] {e}")
-        await msg.reply("⚠️ Не удалось отправить сообщение дропу.")
+        logger.warning(f"[ОШИБКА ОТПРАВКИ В ГРУППУ] {e}")
+        await msg.reply("⚠️ Не удалось отправить сообщение в группу.")
 
 
 @dp.callback_query_handler(lambda c: c.data == "leave_queue")
