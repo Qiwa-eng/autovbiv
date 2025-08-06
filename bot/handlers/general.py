@@ -3,6 +3,7 @@ from aiogram.types import InputFile
 from html import escape
 import os
 
+from aiogram.dispatcher.handler import CancelHandler
 from ..config import dp, logger
 from ..queue import user_queue, user_queue_lock
 from ..storage import save_data, issued_numbers
@@ -10,27 +11,17 @@ from ..utils import fetch_russian_joke
 from .number_request import update_queue_messages
 
 
-@dp.message_handler(commands=["start"])
-async def cmd_start(msg: types.Message) -> None:
-    logger.info(f"[CMD /start] user_id={msg.from_user.id}")
-    await msg.reply(
-        "Привет! Отправь <b>номер</b>, чтобы получить номер телефона.\n"
-        "Доступные команды: /help",
-        parse_mode="HTML",
-    )
+@dp.message_handler(chat_type=types.ChatType.PRIVATE)
+async def ignore_private(msg: types.Message) -> None:
+    logger.info(f"[PRIVATE MESSAGE IGNORED] user_id={msg.from_user.id}")
+    raise CancelHandler()
 
 
-@dp.message_handler(commands=["help"])
-async def cmd_help(msg: types.Message) -> None:
-    logger.info(f"[CMD /help] user_id={msg.from_user.id}")
-    await msg.reply(
-        "Доступные команды:\n"
-        "/start — приветствие\n"
-        "/help — список команд\n"
-        "/queue (/очередь) — ваша позиция в очереди\n"
-        "/leave — выйти из очереди\n"
-        "/joke (/анекдот) — случайный анекдот",
-    )
+@dp.callback_query_handler(lambda c: c.message.chat.type == types.ChatType.PRIVATE)
+async def ignore_private_callback(call: types.CallbackQuery) -> None:
+    logger.info(f"[PRIVATE CALLBACK IGNORED] user_id={call.from_user.id}")
+    await call.answer()
+    raise CancelHandler()
 
 
 @dp.message_handler(commands=["queue", "очередь"])
