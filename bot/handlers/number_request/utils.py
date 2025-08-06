@@ -3,7 +3,7 @@ from datetime import datetime
 from html import escape
 
 from aiogram import types
-from aiogram.utils.exceptions import MessageNotModified
+from aiogram.utils.exceptions import MessageNotModified, MessageToReplyNotFound
 
 from ...config import dp, bot, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1, logger
 from ...queue import (
@@ -173,14 +173,31 @@ async def try_dispatch_next():
             "✉️ <i>Ответьте на это сообщение и отправьте код.</i>\n"
             "⚠️ <b>Если есть проблема</b>, воспользуйтесь кнопкой ниже и приложите <u>скрин</u>."
         )
+        send_kwargs = {
+            "chat_id": user["chat_id"],
+            "text": message_text,
+            "reply_to_message_id": user["request_msg_id"],
+            "reply_markup": get_number_action_keyboard(),
+            "parse_mode": "HTML",
+        }
         try:
-            sent = await bot.send_message(
-                chat_id=user['chat_id'],
-                text=message_text,
-                reply_to_message_id=user['request_msg_id'],
-                reply_markup=get_number_action_keyboard(),
-                parse_mode="HTML",
+            sent = await bot.send_message(**send_kwargs)
+        except MessageToReplyNotFound:
+            logger.warning(
+                f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: Message to be replied not found"
             )
+            send_kwargs.pop("reply_to_message_id", None)
+            try:
+                sent = await bot.send_message(**send_kwargs)
+            except Exception as e:
+                logger.warning(f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: {e}")
+                async with number_queue_lock:
+                    number_queue.appendleft(number)
+                async with user_queue_lock:
+                    user_queue.appendleft(user)
+                save_data()
+                asyncio.create_task(update_queue_messages())
+                continue
         except Exception as e:
             logger.warning(f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: {e}")
             async with number_queue_lock:
