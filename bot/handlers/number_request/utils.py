@@ -15,42 +15,55 @@ from ...queue import (
     number_queue_lock,
     user_queue_lock,
     contact_bindings,
+    active_numbers,
 )
 from ... import queue as queue_state
 from ...storage import save_data, save_history, history, issued_numbers
 from ...utils import get_number_action_keyboard, fetch_russian_joke
 
 
+_queue_update_lock = asyncio.Lock()
+_queue_last_update = 0.0
+
+
 async def update_queue_messages():
-    logger.debug("[ОЧЕРЕДЬ] обновление сообщений")
-    async with user_queue_lock:
-        sorted_users = list(sorted(user_queue, key=lambda x: x["timestamp"]))
-    for idx, user in enumerate(sorted_users):
-        try:
-            position = idx + 1
-            await bot.edit_message_text(
-                chat_id=user["chat_id"],
-                message_id=user["notify_msg_id"],
-                text=(
-                    "⏳ <b>Ожидание номера</b>\n"
-                    f"Ваша позиция: <b>{position}</b>"
-                ),
-                parse_mode="HTML",
-                reply_markup=types.InlineKeyboardMarkup().add(
-                    types.InlineKeyboardButton(
-                        "🚪 Выйти из очереди", callback_data="leave_queue"
-                    )
-                ),
-            )
-        except MessageNotModified:
-            logger.debug(
-                f"[ОЧЕРЕДЬ] сообщение {user['notify_msg_id']} без изменений"
-            )
-            continue
-        except Exception as e:
-            logger.warning(
-                f"[ОШИБКА ОБНОВЛЕНИЯ ОЧЕРЕДИ] user_id={user['user_id']}: {e}"
-            )
+    global _queue_last_update
+    now = asyncio.get_event_loop().time()
+    if now - _queue_last_update < 5:
+        return
+    async with _queue_update_lock:
+        if now - _queue_last_update < 5:
+            return
+        _queue_last_update = now
+        logger.debug("[ОЧЕРЕДЬ] обновление сообщений")
+        async with user_queue_lock:
+            users = list(user_queue)
+        for idx, user in enumerate(users):
+            try:
+                position = idx + 1
+                await bot.edit_message_text(
+                    chat_id=user["chat_id"],
+                    message_id=user["notify_msg_id"],
+                    text=(
+                        "⏳ <b>Ожидание номера</b>\n"
+                        f"Ваша позиция: <b>{position}</b>"
+                    ),
+                    parse_mode="HTML",
+                    reply_markup=types.InlineKeyboardMarkup().add(
+                        types.InlineKeyboardButton(
+                            "🚪 Выйти из очереди", callback_data="leave_queue"
+                        )
+                    ),
+                )
+            except MessageNotModified:
+                logger.debug(
+                    f"[ОЧЕРЕДЬ] сообщение {user['notify_msg_id']} без изменений"
+                )
+                continue
+            except Exception as e:
+                logger.warning(
+                    f"[ОШИБКА ОБНОВЛЕНИЯ ОЧЕРЕДИ] user_id={user['user_id']}: {e}"
+                )
 
 
 @dp.message_handler(content_types=types.ContentTypes.PHOTO)
@@ -64,7 +77,7 @@ async def handle_photo_response(msg: types.Message):
         return
 
     drop_id = binding.get("drop_id")
-    number = binding.get("text")
+    number = binding.get("number") or binding.get("text")
 
     try:
         await bot.send_photo(
@@ -95,6 +108,7 @@ async def handle_photo_response(msg: types.Message):
         )
     finally:
         bindings.pop(msg_key, None)
+        active_numbers.discard(number)
         if drop_id:
             contact_bindings[msg_key] = {"drop_id": drop_id, "text": number}
         save_data()
@@ -105,7 +119,7 @@ async def joke_dispatcher():
     while True:
         now = datetime.utcnow().timestamp()
         for user in list(user_queue):
-            ts = datetime.fromisoformat(user["timestamp"]).timestamp()
+            ts = user["timestamp"]
             if now - ts >= 60 and user['user_id'] not in sent_users:
                 joke = fetch_russian_joke()
                 try:
@@ -150,12 +164,7 @@ async def try_dispatch_next():
             async with user_queue_lock:
                 if number_queue and user_queue:
                     number = number_queue.popleft()
-                    sorted_users = sorted(
-                        user_queue,
-                        key=lambda u: datetime.fromisoformat(u['timestamp'])
-                    )
-                    user = sorted_users[0]
-                    user_queue.remove(user)
+                    user = user_queue.popleft()
                 else:
                     break
 
@@ -214,6 +223,7 @@ async def try_dispatch_next():
             "group_id": number['from_group_id'],
             "user_id": user['user_id'],
             "text": number['text'],
+            "number": number.get('number'),
             "added_at": number.get("added_at"),
             "queue_data": user.copy(),
         }

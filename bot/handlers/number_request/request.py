@@ -14,6 +14,7 @@ from ...queue import (
     IGNORED_TOPICS,
     number_queue_lock,
     user_queue_lock,
+    active_numbers,
 )
 from ... import queue as queue_state
 from ...storage import save_data, history, issued_numbers
@@ -82,6 +83,7 @@ async def handle_number_request(msg: types.Message):
             "user_id": msg.from_user.id,
             "drop_id": number.get("drop_id"),
             "text": number['text'],
+            "number": number.get('number'),
             "added_at": number.get("added_at"),
         }
         issued_numbers.append(number["text"])
@@ -105,7 +107,7 @@ async def handle_number_request(msg: types.Message):
                     "user_id": msg.from_user.id,
                     "chat_id": msg.chat.id,
                     "request_msg_id": msg.message_id,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.utcnow().timestamp(),
                     "notify_msg_id": notify.message_id,
                 }
             )
@@ -154,24 +156,20 @@ async def handle_number_sources(msg: types.Message):
                 blocked_numbers.pop(number_text, None)
 
         async with number_queue_lock:
-            duplicate_in_queue = any(
-                number_text in item.get("text", "") for item in number_queue
-            )
-            duplicate_in_bindings = any(
-                number_text in item.get("text", "") for item in bindings.values()
-            )
-            duplicate = duplicate_in_queue or duplicate_in_bindings
+            duplicate = number_text in active_numbers
             if not duplicate:
                 number_queue.append(
                     {
                         "message_id": msg.message_id,
                         "topic_id": msg.message_thread_id,
                         "text": msg.text,
+                        "number": number_text,
                         "from_group_id": msg.chat.id,
                         "drop_id": msg.from_user.id,
                         "added_at": datetime.utcnow().timestamp(),
                     }
                 )
+                active_numbers.add(number_text)
         if duplicate:
             await bot.send_message(
                 chat_id=msg.chat.id,
