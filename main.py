@@ -1,7 +1,14 @@
+import asyncio
+
 from bot import dp
-from bot.config import logger
-from aiogram import executor
+from bot.config import bot, logger
+
+
+async def main() -> None:
+    """Start the bot with polling."""
+    logger.info("Starting bot polling")
+    await dp.start_polling(bot, skip_updates=True)
+
 
 if __name__ == "__main__":
-    logger.info("Starting bot polling")
-    executor.start_polling(dp, skip_updates=True)
+    asyncio.run(main())

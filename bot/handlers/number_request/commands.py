@@ -4,10 +4,10 @@ from datetime import datetime, timedelta
 from html import escape
 from zoneinfo import ZoneInfo
 
-from aiogram import types
+from aiogram.filters import Command, CommandObject
+from aiogram.types import Message
 
 from ...config import (
-    dp,
     bot,
     GROUP1_ID,
     GROUP2_IDS,
@@ -30,10 +30,11 @@ from ...storage import save_data, QUEUE_FILE
 from ...utils import phone_pattern
 from .utils import try_dispatch_next
 from ... import config as cfg
+from . import router
 
 
-@dp.message_handler(commands=["work"])
-async def remove_topic_from_ignore(msg: types.Message):
+@router.message(Command("work"))
+async def remove_topic_from_ignore(msg: Message) -> None:
     if msg.from_user.id != ADMIN_ID:
         return
 
@@ -50,8 +51,8 @@ async def remove_topic_from_ignore(msg: types.Message):
         await msg.reply("⚠️ Команду можно использовать только в теме.")
 
 
-@dp.message_handler(commands=["удалить", "delete"])
-async def remove_number_from_queue(msg: types.Message):
+@router.message(Command(commands=["удалить", "delete"]))
+async def remove_number_from_queue(msg: Message, command: CommandObject) -> None:
     if msg.chat.id not in {GROUP1_ID, *GROUP2_IDS}:
         return
 
@@ -65,7 +66,8 @@ async def remove_number_from_queue(msg: types.Message):
             number_text = match.group(0)
 
     if not number_text:
-        match = phone_pattern.search(msg.get_args())
+        args = (command.args or "")
+        match = phone_pattern.search(args)
         if match:
             number_text = match.group(0)
 
@@ -89,15 +91,14 @@ async def remove_number_from_queue(msg: types.Message):
         save_data()
         await msg.reply(
             f"✅ Номер <code>{escape(number_text)}</code> удалён из очереди.",
-            parse_mode="HTML",
         )
         logger.info(f"[УДАЛЕНИЕ] {number_text} → user_id={msg.from_user.id}")
     else:
         await msg.reply("⚠️ Номер не найден в очереди.")
 
 
-@dp.message_handler(commands=["очистить"])
-async def handle_clear_queue(msg: types.Message):
+@router.message(Command("очистить"))
+async def handle_clear_queue(msg: Message) -> None:
     if msg.chat.id not in GROUP2_IDS:
         return
 
@@ -124,8 +125,8 @@ async def handle_clear_queue(msg: types.Message):
     logger.info(f"[ОЧИСТКА] Инициирована пользователем {msg.from_user.id}")
 
 
-@dp.message_handler(commands=["очередь"])
-async def handle_queue_status(msg: types.Message):
+@router.message(Command("очередь"))
+async def handle_queue_status(msg: Message) -> None:
     if msg.chat.id not in GROUP2_IDS:
         return
 
@@ -160,8 +161,8 @@ async def handle_queue_status(msg: types.Message):
     await msg.reply(text)
 
 
-@dp.message_handler(commands=["id"])
-async def handle_id_command(msg: types.Message):
+@router.message(Command("id"))
+async def handle_id_command(msg: Message) -> None:
     chat_id = msg.chat.id
     thread_id = msg.message_thread_id
 
@@ -172,8 +173,8 @@ async def handle_id_command(msg: types.Message):
     await msg.reply(text)
 
 
-@dp.message_handler(commands=["nework"])
-async def add_topic_to_ignore(msg: types.Message):
+@router.message(Command("nework"))
+async def add_topic_to_ignore(msg: Message) -> None:
     if msg.from_user.id != ADMIN_ID:
         return
 
@@ -187,12 +188,12 @@ async def add_topic_to_ignore(msg: types.Message):
         await msg.reply("⚠️ Команду можно использовать только внутри темы.")
 
 
-@dp.message_handler(commands=["group1_add"])
-async def handle_group1_add(msg: types.Message):
+@router.message(Command("group1_add"))
+async def handle_group1_add(msg: Message, command: CommandObject) -> None:
     if msg.from_user.id != ADMIN_ID:
         return
 
-    args = msg.get_args().strip()
+    args = (command.args or "").strip()
     if args:
         try:
             group_id = int(args)
@@ -200,16 +201,17 @@ async def handle_group1_add(msg: types.Message):
             await msg.reply("ID должен быть числом")
             return
     else:
-        group_id = msg.chat.id
+        await msg.reply("Укажите ID группы")
+        return
 
     global GROUP1_ID
     GROUP1_ID = cfg.GROUP1_ID = group_id
     save_ids()
-    await msg.reply(f"GROUP1_ID установлен: <code>{group_id}</code>", parse_mode="HTML")
+    await msg.reply(f"GROUP1_ID установлен: <code>{group_id}</code>")
 
 
-@dp.message_handler(commands=["group1_remove"])
-async def handle_group1_remove(msg: types.Message):
+@router.message(Command("group1_remove"))
+async def handle_group1_remove(msg: Message) -> None:
     if msg.from_user.id != ADMIN_ID:
         return
 
@@ -219,12 +221,12 @@ async def handle_group1_remove(msg: types.Message):
     await msg.reply("GROUP1_ID удалён")
 
 
-@dp.message_handler(commands=["group2_add"])
-async def handle_group2_add(msg: types.Message):
+@router.message(Command("group2_add"))
+async def handle_group2_add(msg: Message, command: CommandObject) -> None:
     if msg.from_user.id != ADMIN_ID:
         return
 
-    args = msg.get_args().strip()
+    args = (command.args or "").strip()
     if args:
         try:
             group_id = int(args)
@@ -237,15 +239,15 @@ async def handle_group2_add(msg: types.Message):
     if group_id not in GROUP2_IDS:
         GROUP2_IDS.append(group_id)
         save_ids()
-    await msg.reply(f"Добавлена группа2: <code>{group_id}</code>", parse_mode="HTML")
+    await msg.reply(f"Добавлена группа2: <code>{group_id}</code>")
 
 
-@dp.message_handler(commands=["group2_remove"])
-async def handle_group2_remove(msg: types.Message):
+@router.message(Command("group2_remove"))
+async def handle_group2_remove(msg: Message, command: CommandObject) -> None:
     if msg.from_user.id != ADMIN_ID:
         return
 
-    args = msg.get_args().strip()
+    args = (command.args or "").strip()
     if args:
         try:
             group_id = int(args)
@@ -259,14 +261,14 @@ async def handle_group2_remove(msg: types.Message):
         GROUP2_IDS.remove(group_id)
         save_ids()
         await msg.reply(
-            f"Группа2 <code>{group_id}</code> удалена", parse_mode="HTML"
+            f"Группа2 <code>{group_id}</code> удалена",
         )
     else:
         await msg.reply("Такой группы нет в списке")
 
 
-@dp.message_handler(commands=["thread_add"])
-async def handle_thread_add(msg: types.Message):
+@router.message(Command("thread_add"))
+async def handle_thread_add(msg: Message) -> None:
     if msg.from_user.id != ADMIN_ID:
         return
 
@@ -279,12 +281,12 @@ async def handle_thread_add(msg: types.Message):
         TOPIC_IDS_GROUP1.append(topic_id)
         save_ids()
     await msg.reply(
-        f"Тема <code>{topic_id}</code> добавлена", parse_mode="HTML"
+        f"Тема <code>{topic_id}</code> добавлена",
     )
 
 
-@dp.message_handler(commands=["thread_remove"])
-async def handle_thread_remove(msg: types.Message):
+@router.message(Command("thread_remove"))
+async def handle_thread_remove(msg: Message) -> None:
     if msg.from_user.id != ADMIN_ID:
         return
 
@@ -297,14 +299,14 @@ async def handle_thread_remove(msg: types.Message):
         TOPIC_IDS_GROUP1.remove(topic_id)
         save_ids()
         await msg.reply(
-            f"Тема <code>{topic_id}</code> удалена", parse_mode="HTML"
+            f"Тема <code>{topic_id}</code> удалена",
         )
     else:
         await msg.reply("Такой темы нет в списке")
 
 
-@dp.message_handler(commands=["stop_work", "stopwork", "stop"])
-async def handle_stop_work(msg: types.Message):
+@router.message(Command(commands=["stop_work", "stopwork", "stop"]))
+async def handle_stop_work(msg: Message) -> None:
     if msg.chat.id not in GROUP2_IDS and msg.from_user.id != ADMIN_ID:
         return
     if queue_state.start_task:
@@ -314,12 +316,12 @@ async def handle_stop_work(msg: types.Message):
     await msg.reply("⏸️ Бот приостановил работу.")
 
 
-@dp.message_handler(commands=["start_work", "startwork"])
-async def handle_start_work(msg: types.Message):
+@router.message(Command(commands=["start_work", "startwork"]))
+async def handle_start_work(msg: Message, command: CommandObject) -> None:
     if msg.chat.id not in GROUP2_IDS and msg.from_user.id != ADMIN_ID:
         return
 
-    args = msg.get_args().strip()
+    args = (command.args or "").strip()
     if args:
         try:
             target = datetime.strptime(args, "%H:%M").time()
@@ -349,7 +351,7 @@ async def handle_start_work(msg: types.Message):
 
         queue_state.start_task = asyncio.create_task(resume())
         await msg.reply(
-            f"⏳ Работа возобновится в {start_dt.strftime('%H:%M')} МСК"
+            f"⏳ Работа возобновится в {start_dt.strftime('%H:%M')} МСК",
         )
     else:
         if queue_state.start_task:
@@ -358,4 +360,3 @@ async def handle_start_work(msg: types.Message):
         queue_state.WORKING = True
         await msg.reply("▶️ Бот возобновил работу.")
         await try_dispatch_next()
-

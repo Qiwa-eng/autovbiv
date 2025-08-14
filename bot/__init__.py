@@ -1,12 +1,15 @@
 import asyncio
 
-from .config import dp
+from .config import bot, dp
 from .storage import load_data, load_history
-# Import general handlers before number_request so command handlers register first
-from .handlers import general, number_request
+from .handlers.general import router as general_router
+from .handlers.number_request import router as number_request_router, joke_dispatcher
 
 load_data()
 load_history()
-asyncio.get_event_loop().create_task(number_request.joke_dispatcher())
 
-__all__ = ["dp"]
+dp.include_router(general_router)
+dp.include_router(number_request_router)
+asyncio.get_event_loop().create_task(joke_dispatcher())
+
+__all__ = ["dp", "bot"]
