@@ -9,6 +9,8 @@ blocked_numbers = {}
 IGNORED_TOPICS = set()
 contact_requests = {}
 active_numbers = set()
+pending_code_requests = {}
+pending_balance_requests = {}
 
 # Locks for async-safe operations on queues
 number_queue_lock = asyncio.Lock()
