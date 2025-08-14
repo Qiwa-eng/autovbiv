@@ -13,6 +13,8 @@ from ...queue import (
     number_queue_lock,
     user_queue_lock,
     active_numbers,
+    pending_code_requests,
+    pending_balance_requests,
 )
 from ...storage import save_data
 from .utils import update_queue_messages, try_dispatch_next
@@ -198,5 +200,112 @@ async def leave_queue(call: types.CallbackQuery):
     else:
         await call.answer("Вы не были в очереди.", show_alert=True)
 
-    save_data()
-    await update_queue_messages()
+
+@dp.callback_query_handler(lambda c: c.data in ["request_code1", "request_code2"])
+async def handle_code_request(call: types.CallbackQuery):
+    msg_id = call.message.message_id
+    binding = bindings.get(str(msg_id))
+    if not binding:
+        return await call.answer("⚠️ Номер не найден.", show_alert=True)
+
+    number_text = binding.get("number") or binding.get("text")
+    code_type = "первый" if call.data == "request_code1" else "второй"
+
+    sent = await bot.send_message(
+        chat_id=binding["group_id"],
+        message_thread_id=binding["topic_id"],
+        reply_to_message_id=binding["orig_msg_id"],
+        text=f"Запрос {code_type} код для номера {number_text}. Ответьте кодом.",
+    )
+
+    pending_code_requests[sent.message_id] = {
+        "type": code_type,
+        "target_chat_id": call.message.chat.id,
+        "target_message_id": msg_id,
+    }
+
+    await call.answer("Запрос отправлен")
+
+
+@dp.message_handler(
+    lambda m: m.reply_to_message and m.reply_to_message.message_id in pending_code_requests
+)
+async def handle_code_response(msg: types.Message):
+    req = pending_code_requests.pop(msg.reply_to_message.message_id, None)
+    if not req:
+        return
+    code = msg.text.strip()
+    label = "Первый" if req["type"] == "первый" else "Второй"
+    await bot.send_message(
+        req["target_chat_id"],
+        f"{label} код: {code}",
+        reply_to_message_id=req["target_message_id"],
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data == "mts_calls")
+async def handle_mts_calls(call: types.CallbackQuery):
+    binding = bindings.get(str(call.message.message_id))
+    if not binding:
+        return await call.answer("⚠️ Номер не найден.", show_alert=True)
+    await bot.send_message(
+        chat_id=binding["group_id"],
+        message_thread_id=binding["topic_id"],
+        reply_to_message_id=binding["orig_msg_id"],
+        text="Пожалуйста, подключите МТС звонки, тутор есть в группе",
+    )
+    await call.answer("Отправлено")
+
+
+@dp.callback_query_handler(lambda c: c.data == "neg_balance")
+async def handle_negative_balance(call: types.CallbackQuery):
+    binding = bindings.get(str(call.message.message_id))
+    if not binding:
+        return await call.answer("⚠️ Номер не найден.", show_alert=True)
+
+    keyboard = types.InlineKeyboardMarkup().add(
+        types.InlineKeyboardButton(
+            "Да", callback_data=f"balance_yes:{call.message.message_id}"
+        ),
+        types.InlineKeyboardButton(
+            "Нет", callback_data=f"balance_no:{call.message.message_id}"
+        ),
+    )
+
+    sent = await bot.send_message(
+        chat_id=binding["group_id"],
+        message_thread_id=binding["topic_id"],
+        reply_to_message_id=binding["orig_msg_id"],
+        text="Ваш баланс минусовой, будете пополнять?",
+        reply_markup=keyboard,
+    )
+
+    pending_balance_requests[sent.message_id] = {
+        "target_chat_id": call.message.chat.id,
+        "target_message_id": call.message.message_id,
+        "drop_id": binding.get("drop_id"),
+    }
+
+    await call.answer("Запрос отправлен")
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("balance_"))
+async def handle_balance_choice(call: types.CallbackQuery):
+    action, msg_id_str = call.data.split(":", 1)
+    info = pending_balance_requests.get(call.message.message_id)
+    if not info:
+        return await call.answer("Не найдено", show_alert=True)
+
+    drop_id = info.get("drop_id")
+    if drop_id and call.from_user.id != drop_id:
+        return await call.answer("Не для вас", show_alert=True)
+
+    text = "Пополнит баланс" if action == "balance_yes" else "Не будет пополнять"
+    await bot.send_message(
+        info["target_chat_id"],
+        text,
+        reply_to_message_id=info["target_message_id"],
+    )
+    await call.message.edit_text(f"Ответ: {'Да' if action == 'balance_yes' else 'Нет'}")
+    pending_balance_requests.pop(call.message.message_id, None)
+    await call.answer("Ответ отправлен")

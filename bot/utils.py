@@ -8,16 +8,16 @@ phone_pattern = re.compile(r"(?:\+7|7|8)?[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d
 
 def get_number_action_keyboard():
     """Keyboard with actions for an issued number."""
-    return (
-        InlineKeyboardMarkup(row_width=2)
-        .add(
-            InlineKeyboardButton("\U0001F504 \u0414\u0440\u0443\u0433\u043E\u0439", callback_data="skip_number"),
-            InlineKeyboardButton("\u26D4 \u041F\u0440\u043E\u0431\u043B\u0435\u043C\u0430", callback_data="error_reason"),
-        )
-        .add(
-            InlineKeyboardButton("\U0001F4DE \u0421\u0432\u044F\u0437\u044C \u0441 \u0434\u0440\u043E\u043F\u043E\u043C", callback_data="contact_drop")
-        )
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("1 код", callback_data="request_code1"),
+        InlineKeyboardButton("2 код", callback_data="request_code2"),
     )
+    kb.add(
+        InlineKeyboardButton("\U0001F4F2 МТС звонки", callback_data="mts_calls"),
+        InlineKeyboardButton("\U0001F4B0 Минусовой баланс", callback_data="neg_balance"),
+    )
+    return kb
 
 JOKES: List[str] = [
     "— Мама, что такое черный юмор? — Сынок, видишь вон там мужчину без рук? Вели ему похлопать в ладоши. — Я же слепой! — Вот именно.",
