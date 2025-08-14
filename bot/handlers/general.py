@@ -1,6 +1,16 @@
 from aiogram import F, Router
 from aiogram.enums import ChatType
-from aiogram.exceptions import SkipHandler
+
+# ``SkipHandler`` location changed between aiogram versions.  In aiogram 3 it
+# lives in ``aiogram.exceptions`` but older releases exposed it from
+# ``aiogram.dispatcher.handler``.  Attempt to import from the new location first
+# and gracefully fall back to the old one so that the bot can start regardless
+# of the installed aiogram version.
+try:  # pragma: no cover - import resolution tested by running the bot
+    from aiogram.exceptions import SkipHandler  # type: ignore
+except Exception:  # pragma: no cover - executed on old aiogram versions
+    from aiogram.dispatcher.handler import SkipHandler  # type: ignore
+
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InputFile, Message
 from html import escape
