@@ -4,6 +4,7 @@ import json
 import logging
 import asyncio
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 # Load environment variables from a .env file if python-dotenv is installed
@@ -60,7 +61,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
+# aiogram 3.7 removed ``parse_mode`` from ``Bot`` initializer. Configure
+# default settings via ``DefaultBotProperties`` instead.
+bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
 
