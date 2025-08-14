@@ -1,11 +1,10 @@
-import os
 from datetime import datetime
 from statistics import mean
 from html import escape
 
-from aiogram import types
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from ...config import dp, bot, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1, logger
+from ...config import bot, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1, logger
 from ...queue import (
     number_queue,
     user_queue,
@@ -20,10 +19,11 @@ from ... import queue as queue_state
 from ...storage import save_data, history, issued_numbers
 from ...utils import phone_pattern, get_number_action_keyboard
 from .utils import update_queue_messages, try_dispatch_next
+from . import router
 
 
-@dp.message_handler(lambda msg: msg.text and msg.text.lower() == "номер")
-async def handle_number_request(msg: types.Message):
+@router.message(lambda msg: msg.text and msg.text.lower() == "номер")
+async def handle_number_request(msg: Message) -> None:
     logger.info(
         f"[ЗАПРОС НОМЕРА] user_id={msg.from_user.id} chat_id={msg.chat.id} topic={msg.message_thread_id}"
     )
@@ -32,15 +32,15 @@ async def handle_number_request(msg: types.Message):
     if msg.chat.type == "private":
         logger.debug(f"[ЗАПРОС НОМЕРА] user_id={msg.from_user.id} в приватном чате")
         return await msg.reply(
-            "❌ Команда <b>номер</b> работает только в группе.", parse_mode="HTML"
+            "❌ Команда <b>номер</b> работает только в группе.",
         )
 
     if msg.message_thread_id in IGNORED_TOPICS:
         logger.debug(
-            f"[ЗАПРОС НОМЕРА] тема {msg.message_thread_id} в списке игнора"
+            f"[ЗАПРОС НОМЕРА] тема {msg.message_thread_id} в списке игнора",
         )
         return await msg.reply(
-            "⚠️ В этой теме бот не работает. Активируйте её командой /work."
+            "⚠️ В этой теме бот не работает. Активируйте её командой /work.",
         )
 
     if msg.chat.id not in GROUP2_IDS:
@@ -49,17 +49,14 @@ async def handle_number_request(msg: types.Message):
 
     async with user_queue_lock:
         for entry in user_queue:
-            if entry['user_id'] == msg.from_user.id:
+            if entry["user_id"] == msg.from_user.id:
                 logger.debug(
-                    f"[ЗАПРОС НОМЕРА] user_id={msg.from_user.id} уже в очереди"
+                    f"[ЗАПРОС НОМЕРА] user_id={msg.from_user.id} уже в очереди",
                 )
                 return await msg.reply("⚠️ Вы уже в очереди на номер.")
 
     async with number_queue_lock:
-        if number_queue:
-            number = number_queue.popleft()
-        else:
-            number = None
+        number = number_queue.popleft() if number_queue else None
 
     if number:
         message_text = (
@@ -73,17 +70,16 @@ async def handle_number_request(msg: types.Message):
             text=message_text,
             reply_to_message_id=msg.message_id,
             reply_markup=get_number_action_keyboard(),
-            parse_mode="HTML",
         )
 
         bindings[str(sent.message_id)] = {
-            "orig_msg_id": number['message_id'],
-            "topic_id": number['topic_id'],
-            "group_id": number['from_group_id'],
+            "orig_msg_id": number["message_id"],
+            "topic_id": number["topic_id"],
+            "group_id": number["from_group_id"],
             "user_id": msg.from_user.id,
             "drop_id": number.get("drop_id"),
-            "text": number['text'],
-            "number": number.get('number'),
+            "text": number["text"],
+            "number": number.get("number"),
             "added_at": number.get("added_at"),
         }
         issued_numbers.append(number["text"])
@@ -95,9 +91,8 @@ async def handle_number_request(msg: types.Message):
         logger.info(f"[ОЧЕРЕДЬ] user_id={msg.from_user.id} позиция {position}")
         notify = await msg.reply(
             f"⏳ <b>Свободных номеров нет.</b>\nВаша позиция в очереди: <b>{position}</b>",
-            parse_mode="HTML",
-            reply_markup=types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton("🚪 Выйти из очереди", callback_data="leave_queue")
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[[InlineKeyboardButton("🚪 Выйти из очереди", callback_data="leave_queue")]]
             ),
         )
 
@@ -121,11 +116,8 @@ async def handle_number_request(msg: types.Message):
         await update_queue_messages()
 
 
-@dp.message_handler(
-    lambda m: not (m.text and m.text.startswith("/")),
-    content_types=types.ContentTypes.TEXT,
-)
-async def handle_number_sources(msg: types.Message):
+@router.message(lambda m: m.text and not m.text.startswith("/"))
+async def handle_number_sources(msg: Message) -> None:
     if not queue_state.WORKING:
         return
     if msg.message_thread_id in IGNORED_TOPICS:
@@ -198,11 +190,9 @@ async def handle_number_sources(msg: types.Message):
             message_thread_id=msg.message_thread_id,
             reply_to_message_id=msg.message_id,
             text=f"✅ Взял номер\n\n⏱ Примерное ожидание кода: <b>{escape(estimate)}</b>",
-            parse_mode="HTML",
         )
 
         logger.info(
             f"[НОМЕР ПРИНЯТ] {number_text} из темы {msg.message_thread_id}"
         )
         await try_dispatch_next()
-

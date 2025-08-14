@@ -3,7 +3,8 @@ import os
 import json
 import logging
 import asyncio
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
 
 # Load environment variables from a .env file if python-dotenv is installed
 try:  # pragma: no cover - optional dependency
@@ -59,8 +60,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-bot = Bot(token=API_TOKEN, parse_mode=types.ParseMode.HTML)
-dp = Dispatcher(bot)
+bot = Bot(token=API_TOKEN, parse_mode=ParseMode.HTML)
+dp = Dispatcher()
 
 
 class TelegramLogsHandler(logging.Handler):

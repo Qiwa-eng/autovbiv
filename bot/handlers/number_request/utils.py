@@ -2,10 +2,11 @@ import asyncio
 from datetime import datetime
 from html import escape
 
-from aiogram import types
-from aiogram.utils.exceptions import MessageNotModified, MessageToReplyNotFound
+from aiogram import F
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from ...config import dp, bot, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1, logger
+from ...config import bot, GROUP1_ID, GROUP2_IDS, TOPIC_IDS_GROUP1, logger
 from ...queue import (
     number_queue,
     user_queue,
@@ -20,13 +21,14 @@ from ...queue import (
 from ... import queue as queue_state
 from ...storage import save_data, save_history, history, issued_numbers
 from ...utils import get_number_action_keyboard, fetch_russian_joke
+from . import router
 
 
 _queue_update_lock = asyncio.Lock()
 _queue_last_update = 0.0
 
 
-async def update_queue_messages():
+async def update_queue_messages() -> None:
     global _queue_last_update
     now = asyncio.get_event_loop().time()
     if now - _queue_last_update < 5:
@@ -48,17 +50,12 @@ async def update_queue_messages():
                         "⏳ <b>Ожидание номера</b>\n"
                         f"Ваша позиция: <b>{position}</b>"
                     ),
-                    parse_mode="HTML",
-                    reply_markup=types.InlineKeyboardMarkup().add(
-                        types.InlineKeyboardButton(
-                            "🚪 Выйти из очереди", callback_data="leave_queue"
-                        )
+                    reply_markup=InlineKeyboardMarkup(
+                        inline_keyboard=[[InlineKeyboardButton("🚪 Выйти из очереди", callback_data="leave_queue")]]
                     ),
                 )
-            except MessageNotModified:
-                logger.debug(
-                    f"[ОЧЕРЕДЬ] сообщение {user['notify_msg_id']} без изменений"
-                )
+            except TelegramBadRequest as e:
+                logger.debug(f"[ОЧЕРЕДЬ] ошибка обновления: {e}")
                 continue
             except Exception as e:
                 logger.warning(
@@ -66,8 +63,8 @@ async def update_queue_messages():
                 )
 
 
-@dp.message_handler(content_types=types.ContentTypes.PHOTO)
-async def handle_photo_response(msg: types.Message):
+@router.message(F.photo)
+async def handle_photo_response(msg: Message) -> None:
     if not msg.reply_to_message:
         return
 
@@ -81,10 +78,10 @@ async def handle_photo_response(msg: types.Message):
 
     try:
         await bot.send_photo(
-            chat_id=binding['group_id'],
+            chat_id=binding["group_id"],
             photo=msg.photo[-1].file_id,
-            message_thread_id=binding['topic_id'],
-            reply_to_message_id=binding['orig_msg_id'],
+            message_thread_id=binding["topic_id"],
+            reply_to_message_id=binding["orig_msg_id"],
         )
 
         await msg.reply("✅ Код был успешно отправлен")
@@ -121,28 +118,27 @@ async def handle_photo_response(msg: types.Message):
         save_data()
 
 
-async def joke_dispatcher():
+async def joke_dispatcher() -> None:
     sent_users = set()
     while True:
         now = datetime.utcnow().timestamp()
         for user in list(user_queue):
             ts = user["timestamp"]
-            if now - ts >= 60 and user['user_id'] not in sent_users:
+            if now - ts >= 60 and user["user_id"] not in sent_users:
                 joke = fetch_russian_joke()
                 try:
                     await bot.send_message(
                         chat_id=user["chat_id"],
                         text=f"🕓 Пока вы ждёте, вот вам анекдот:\n\n<code>{escape(joke)}</code>",
-                        parse_mode="HTML",
                         reply_to_message_id=user.get("request_msg_id"),
                     )
-                    sent_users.add(user['user_id'])
+                    sent_users.add(user["user_id"])
                 except Exception as e:
                     logger.warning(f"[АНЕКДОТ] user_id={user['user_id']}: {e}")
         await asyncio.sleep(30)
 
 
-async def try_dispatch_next():
+async def try_dispatch_next() -> None:
     if not queue_state.WORKING:
         return
     async with number_queue_lock:
@@ -194,26 +190,18 @@ async def try_dispatch_next():
             "text": message_text,
             "reply_to_message_id": user["request_msg_id"],
             "reply_markup": get_number_action_keyboard(),
-            "parse_mode": "HTML",
         }
         try:
             sent = await bot.send_message(**send_kwargs)
-        except MessageToReplyNotFound:
-            logger.warning(
-                f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: Message to be replied not found"
-            )
-            send_kwargs.pop("reply_to_message_id", None)
-            try:
-                sent = await bot.send_message(**send_kwargs)
-            except Exception as e:
-                logger.warning(f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: {e}")
-                async with number_queue_lock:
-                    number_queue.appendleft(number)
-                async with user_queue_lock:
-                    user_queue.appendleft(user)
-                save_data()
-                asyncio.create_task(update_queue_messages())
-                continue
+        except TelegramBadRequest as e:
+            logger.warning(f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: {e}")
+            async with number_queue_lock:
+                number_queue.appendleft(number)
+            async with user_queue_lock:
+                user_queue.appendleft(user)
+            save_data()
+            asyncio.create_task(update_queue_messages())
+            continue
         except Exception as e:
             logger.warning(f"[ОШИБКА ОТПРАВКИ] user_id={user['user_id']}: {e}")
             async with number_queue_lock:
@@ -225,12 +213,12 @@ async def try_dispatch_next():
             continue
 
         bindings[str(sent.message_id)] = {
-            "orig_msg_id": number['message_id'],
-            "topic_id": number['topic_id'],
-            "group_id": number['from_group_id'],
-            "user_id": user['user_id'],
-            "text": number['text'],
-            "number": number.get('number'),
+            "orig_msg_id": number["message_id"],
+            "topic_id": number["topic_id"],
+            "group_id": number["from_group_id"],
+            "user_id": user["user_id"],
+            "text": number["text"],
+            "number": number.get("number"),
             "added_at": number.get("added_at"),
             "queue_data": user.copy(),
         }

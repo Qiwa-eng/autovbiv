@@ -1,57 +1,15 @@
-from .callbacks import (
-    error_reason_menu,
-    handle_skip_number,
-    handle_error_choice,
-    leave_queue,
-)
-from .commands import (
-    remove_topic_from_ignore,
-    remove_number_from_queue,
-    handle_clear_queue,
-    handle_queue_status,
-    handle_id_command,
-    add_topic_to_ignore,
-    handle_stop_work,
-    handle_start_work,
-    handle_group1_add,
-    handle_group1_remove,
-    handle_group2_add,
-    handle_group2_remove,
-    handle_thread_add,
-    handle_thread_remove,
-)
-from .utils import (
-    update_queue_messages,
-    handle_photo_response,
-    joke_dispatcher,
-    try_dispatch_next,
-)
-from .request import handle_number_request, handle_number_sources
+from aiogram import Router
+
+router = Router()
+
+# Register submodules to attach handlers to the router
+from . import callbacks, commands, request  # noqa: F401
+from .utils import update_queue_messages, handle_photo_response, joke_dispatcher, try_dispatch_next
 
 __all__ = [
-    "handle_number_request",
-    "handle_number_sources",
-    "error_reason_menu",
-    "handle_skip_number",
-    "handle_error_choice",
-    "leave_queue",
-    "remove_topic_from_ignore",
-    "remove_number_from_queue",
-    "handle_clear_queue",
-    "handle_queue_status",
-    "handle_id_command",
-    "add_topic_to_ignore",
-    "handle_stop_work",
-    "handle_start_work",
-    "handle_group1_add",
-    "handle_group1_remove",
-    "handle_group2_add",
-    "handle_group2_remove",
-    "handle_thread_add",
-    "handle_thread_remove",
+    "router",
     "update_queue_messages",
     "handle_photo_response",
     "joke_dispatcher",
     "try_dispatch_next",
 ]
-

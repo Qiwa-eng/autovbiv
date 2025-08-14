@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
 
-from aiogram import types
+from aiogram import F
+from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from ...config import dp, bot, GROUP2_IDS, logger
+from ...config import bot, GROUP2_IDS, logger
 from ...queue import (
     number_queue,
     user_queue,
@@ -18,23 +19,23 @@ from ...queue import (
 )
 from ...storage import save_data
 from .utils import update_queue_messages, try_dispatch_next
+from . import router
 
 
-@dp.callback_query_handler(lambda c: c.data == "error_reason")
-async def error_reason_menu(call: types.CallbackQuery):
-    keyboard = types.InlineKeyboardMarkup().add(
-        types.InlineKeyboardButton("💥 Моментальная ошибка", callback_data="error_ban"),
-        types.InlineKeyboardButton("⌛ Код не пришёл", callback_data="error_noban"),
-    )
+@router.callback_query(F.data == "error_reason")
+async def error_reason_menu(call: CallbackQuery) -> None:
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton("💥 Моментальная ошибка", callback_data="error_ban"),
+         InlineKeyboardButton("⌛ Код не пришёл", callback_data="error_noban")]
+    ])
     await call.message.edit_text(
         f"{call.message.html_text}\n\n<b>Выберите причину:</b>",
-        parse_mode="HTML",
         reply_markup=keyboard,
     )
 
 
-@dp.callback_query_handler(lambda c: c.data == "skip_number")
-async def handle_skip_number(call: types.CallbackQuery):
+@router.callback_query(F.data == "skip_number")
+async def handle_skip_number(call: CallbackQuery) -> None:
     msg_id = call.message.message_id
     user_id = call.from_user.id
     binding = bindings.get(str(msg_id))
@@ -68,8 +69,8 @@ async def handle_skip_number(call: types.CallbackQuery):
     await try_dispatch_next()
 
 
-@dp.callback_query_handler(lambda c: c.data == "contact_drop")
-async def handle_contact_drop(call: types.CallbackQuery):
+@router.callback_query(F.data == "contact_drop")
+async def handle_contact_drop(call: CallbackQuery) -> None:
     msg_id = call.message.message_id
     msg_key = str(msg_id)
     binding = bindings.get(msg_key) or contact_bindings.get(msg_key)
@@ -90,8 +91,8 @@ async def handle_contact_drop(call: types.CallbackQuery):
     await call.answer()
 
 
-@dp.callback_query_handler(lambda c: c.data in ["error_ban", "error_noban"])
-async def handle_error_choice(call: types.CallbackQuery):
+@router.callback_query(F.data.in_({"error_ban", "error_noban"}))
+async def handle_error_choice(call: CallbackQuery) -> None:
     msg_id = call.message.message_id
     user_id = call.from_user.id
     binding = bindings.get(str(msg_id))
@@ -138,8 +139,8 @@ async def handle_error_choice(call: types.CallbackQuery):
     await try_dispatch_next()
 
 
-@dp.message_handler(lambda msg: msg.from_user.id in contact_requests, content_types=types.ContentTypes.ANY)
-async def forward_contact_message(msg: types.Message):
+@router.message(lambda msg: msg.from_user.id in contact_requests)
+async def forward_contact_message(msg: Message) -> None:
     info = contact_requests.pop(msg.from_user.id)
     number = info.get("number")
     group_id = info.get("group_id")
@@ -173,8 +174,8 @@ async def forward_contact_message(msg: types.Message):
         await msg.reply("⚠️ Не удалось отправить сообщение в группу.")
 
 
-@dp.callback_query_handler(lambda c: c.data == "leave_queue")
-async def leave_queue(call: types.CallbackQuery):
+@router.callback_query(F.data == "leave_queue")
+async def leave_queue(call: CallbackQuery) -> None:
     if call.message.chat.id not in GROUP2_IDS:
         return
 
@@ -182,7 +183,7 @@ async def leave_queue(call: types.CallbackQuery):
         removed = False
         new_queue = []
         for u in user_queue:
-            if u['user_id'] == call.from_user.id:
+            if u["user_id"] == call.from_user.id:
                 removed = True
             else:
                 new_queue.append(u)
@@ -198,11 +199,11 @@ async def leave_queue(call: types.CallbackQuery):
             await call.message.reply("🚪 Вы покинули очередь.")
         logger.info(f"[ВЫХОД ИЗ ОЧЕРЕДИ] user_id={call.from_user.id}")
     else:
-        await call.answer("Вы не были в очереди.", show_alert=True)
+        await call.answer("⚠️ Вас нет в очереди.", show_alert=True)
 
 
-@dp.callback_query_handler(lambda c: c.data in ["request_code1", "request_code2"])
-async def handle_code_request(call: types.CallbackQuery):
+@router.callback_query(F.data.in_({"request_code1", "request_code2"}))
+async def handle_code_request(call: CallbackQuery) -> None:
     msg_id = call.message.message_id
     binding = bindings.get(str(msg_id))
     if not binding:
@@ -227,10 +228,8 @@ async def handle_code_request(call: types.CallbackQuery):
     await call.answer("Запрос отправлен")
 
 
-@dp.message_handler(
-    lambda m: m.reply_to_message and m.reply_to_message.message_id in pending_code_requests
-)
-async def handle_code_response(msg: types.Message):
+@router.message(lambda m: m.reply_to_message and m.reply_to_message.message_id in pending_code_requests)
+async def handle_code_response(msg: Message) -> None:
     req = pending_code_requests.pop(msg.reply_to_message.message_id, None)
     if not req:
         return
@@ -243,8 +242,8 @@ async def handle_code_response(msg: types.Message):
     )
 
 
-@dp.callback_query_handler(lambda c: c.data == "mts_calls")
-async def handle_mts_calls(call: types.CallbackQuery):
+@router.callback_query(F.data == "mts_calls")
+async def handle_mts_calls(call: CallbackQuery) -> None:
     binding = bindings.get(str(call.message.message_id))
     if not binding:
         return await call.answer("⚠️ Номер не найден.", show_alert=True)
@@ -257,20 +256,16 @@ async def handle_mts_calls(call: types.CallbackQuery):
     await call.answer("Отправлено")
 
 
-@dp.callback_query_handler(lambda c: c.data == "neg_balance")
-async def handle_negative_balance(call: types.CallbackQuery):
+@router.callback_query(F.data == "neg_balance")
+async def handle_negative_balance(call: CallbackQuery) -> None:
     binding = bindings.get(str(call.message.message_id))
     if not binding:
         return await call.answer("⚠️ Номер не найден.", show_alert=True)
 
-    keyboard = types.InlineKeyboardMarkup().add(
-        types.InlineKeyboardButton(
-            "Да", callback_data=f"balance_yes:{call.message.message_id}"
-        ),
-        types.InlineKeyboardButton(
-            "Нет", callback_data=f"balance_no:{call.message.message_id}"
-        ),
-    )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton("Да", callback_data=f"balance_yes:{call.message.message_id}"),
+         InlineKeyboardButton("Нет", callback_data=f"balance_no:{call.message.message_id}")]
+    ])
 
     sent = await bot.send_message(
         chat_id=binding["group_id"],
@@ -289,9 +284,9 @@ async def handle_negative_balance(call: types.CallbackQuery):
     await call.answer("Запрос отправлен")
 
 
-@dp.callback_query_handler(lambda c: c.data.startswith("balance_"))
-async def handle_balance_choice(call: types.CallbackQuery):
-    action, msg_id_str = call.data.split(":", 1)
+@router.callback_query(F.data.startswith("balance_"))
+async def handle_balance_choice(call: CallbackQuery) -> None:
+    action, _ = call.data.split(":", 1)
     info = pending_balance_requests.get(call.message.message_id)
     if not info:
         return await call.answer("Не найдено", show_alert=True)
